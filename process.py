@@ -42,7 +42,7 @@ if __name__ == "__main__":
                        config['secrets'].getint('timeshiftdays'),
                        config['secrets'].getfloat('xyte'))
 
-    #                                           [04/Jan/2021:06:12:23
+    #                                           [22/Feb/2222:22:22:22
     dateparse = lambda x: datetime.strptime(x, '[%d/%b/%Y:%H:%M:%S')
 
     # load and process raw logfile
