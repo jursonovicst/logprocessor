@@ -10,6 +10,9 @@ class HashDict(dict):
 
     def __missing__(self, key):
         if self._prefix is None:
-            return urandom(self._hashlen).hex()
+            value = urandom(self._hashlen).hex()
         else:
-            return self._prefix + "-" + urandom(self._hashlen).hex()
+            value = self._prefix + "-" + urandom(self._hashlen).hex()
+
+        self[key] = value
+        return value
