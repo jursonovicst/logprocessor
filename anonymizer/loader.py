@@ -1,7 +1,6 @@
 import pandas as pd
 from multiprocessing import Pool, Manager
 from tqdm.auto import tqdm
-from mapper import SHMemMapper
 from bz2 import BZ2File
 import numpy as np
 from cachetools import cached
@@ -12,6 +11,7 @@ import contextlib
 from datetime import timedelta
 from geolite2 import geolite2
 from urllib.parse import urlsplit
+from mapper import BaseMapper
 
 
 class Loader:
@@ -206,7 +206,7 @@ class Loader:
             storecm = HDFStore(f"{logfilename}.hd5", mode='w')
 
         # create shared memory mappers
-        mappers = {prefix: SHMemMapper(prefix=prefix, hashlen=hashlen) for prefix, hashlen in
+        mappers = {prefix: BaseMapper(prefix=prefix, hashlen=hashlen, store=Manager().dict()) for prefix, hashlen in
                    [('contenttype', 8), ('cachename', 4), ('popname', 4), ('host', 8), ('coordinates', 8),
                     ('devicebrand', 4), ('devicefamily', 4), ('devicemodel', 4), ('osfamily', 4), ('uafamily', 4),
                     ('uamajor', 4), ('path', 16), ('query', 16)]}
