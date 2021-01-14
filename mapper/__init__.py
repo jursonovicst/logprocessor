@@ -1,2 +1,2 @@
 from .basemapper import BaseMapper
-from .shmemmapper import SHMemMapper
+from .hashdict import HashDict

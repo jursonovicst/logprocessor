@@ -1,5 +1,5 @@
 import operator
-from cachetools import LFUCache, cachedmethod
+from cachetools import LRUCache, LFUCache, cachedmethod
 import os
 import pandas as pd
 
@@ -19,7 +19,7 @@ class BaseMapper(object):
         self._hashlen = hashlen
         self._prefix = prefix
         self._store = {} if store is None else store
-        self.cache = LFUCache(maxsize=maxcachesize)
+        self.cache = LRUCache(maxsize=maxcachesize)
 
     @cachedmethod(operator.attrgetter('cache'))
     def get(self, key):
