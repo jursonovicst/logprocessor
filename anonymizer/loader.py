@@ -1,7 +1,7 @@
 import pandas as pd
-import multiprocessing as mp
+from multiprocessing import Pool, Manager
 from tqdm.auto import tqdm
-from mapper import Client
+from mapper import SHMemMapper
 from bz2 import BZ2File
 import numpy as np
 from cachetools import cached
@@ -28,10 +28,15 @@ class Loader:
     _geocache = None
     _uacache = None
 
+    # mappers
+    mappers = {}
+
     @classmethod
-    def initializer(cls, cachename: str, popname: str, cachesize: int, timeshiftdays: int, xyte: float):
-        assert isinstance(cachename, str) and len(cachename) > 0, f"invalid cachename: '{cachename}'"
-        assert isinstance(popname, str) and len(popname) > 0, f"invalid cachename: '{popname}'"
+    def initializer(cls, mappers: dict, cachename: str, popname: str, cachesize: int, timeshiftdays: int, xyte: float):
+        cls.mappers = mappers
+
+        assert len(cachename) > 0, f"invalid cachename: '{cachename}'"
+        assert len(popname) > 0, f"invalid cachename: '{popname}'"
         cls._cachename = cachename
         cls._popname = popname
 
@@ -152,35 +157,11 @@ class Loader:
         #########################
         # anonymize
 
-        # create mapper client and substitute
-        client = Client(cls._cachesize, prefix='coordinates', hashlen=8)
-        chunk['contenttype'] = chunk['contenttype'].map(client.get, na_action='ignore')
-        client.prefix = 'devicebrand'
-        client.prefix = 'cachename'
-        chunk['cachename'] = chunk['cachename'].map(client.get, na_action='ignore')
-        client.prefix = 'popname'
-        chunk['popname'] = chunk['popname'].map(client.get, na_action='ignore')
-        client.prefix = 'host'
-        chunk['host'] = chunk['host'].map(client.get, na_action='ignore')
-        chunk['coordinates'] = chunk['coordinates'].map(client.get, na_action='ignore')
-        client.prefix = 'contenttype'
-        chunk['devicebrand'] = chunk['devicebrand'].map(client.get, na_action='ignore')
-        client.prefix = 'devicefamily'
-        chunk['devicefamily'] = chunk['devicefamily'].map(client.get, na_action='ignore')
-        client.prefix = 'devicemodel'
-        chunk['devicemodel'] = chunk['devicemodel'].map(client.get, na_action='ignore')
-        client.prefix = 'osfamily'
-        chunk['osfamily'] = chunk['osfamily'].map(client.get, na_action='ignore')
-        client.prefix = 'uafamily'
-        chunk['uafamily'] = chunk['uafamily'].map(client.get, na_action='ignore')
-        client.prefix = 'uamajor'
-        chunk['uamajor'] = chunk['uamajor'].map(client.get, na_action='ignore')
-
-        client.prefix = 'path'
-        client.hashlen = 20
-        chunk['path'] = chunk['path'].map(client.get, na_action='ignore')
-        client.prefix = 'query'
-        chunk['query'] = chunk['query'].map(client.get, na_action='ignore')
+        # substitute: map values to random hashes
+        for prefix in ['contenttype', 'cachename', 'popname', 'host', 'coordinates', 'devicebrand',
+                       'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path', 'query']:
+            assert prefix in Loader.mappers, f"Mapper prefix issue: '{prefix}' not found in '{Loader.mappers}'"
+            chunk[prefix] = chunk[prefix].map(Loader.mappers[prefix].get, na_action='ignore')
 
         if _debug: print(chunk.head(5))
 
@@ -222,14 +203,24 @@ class Loader:
         else:
             storecm = HDFStore(f"{logfilename}.hd5", mode='w')
 
+        # create shared memory mappers
+        mappers = {prefix: SHMemMapper(prefix=prefix, hashlen=hashlen) for prefix, hashlen in
+                   [('contenttype', 8), ('cachename', 4), ('popname', 4), ('host', 8), ('coordinates', 8),
+                    ('devicebrand', 4), ('devicefamily', 4), ('devicemodel', 4), ('osfamily', 4), ('uafamily', 4),
+                    ('uamajor', 4), ('path', 16), ('query', 16)]}
+
+        # load mapper secrets
+        for prefix, mapper in mappers.items():
+            mapper.load(f"secrets/secrets_{prefix}.csv")
+
         # start worker processes with initializer (worker parameters and secrets)
         # open raw logfile
         # create progress bar for file position
         # create progress bar for processed lines
         # create decompressor
         # create store (if needed)
-        with mp.Pool(self._nproc, Loader.initializer,
-                     (cachename, popname, self._cachesize, self.timeshiftdays, self.xyte,)) as pool, \
+        with Pool(self._nproc, Loader.initializer,
+                  (mappers, cachename, popname, self._cachesize, self.timeshiftdays, self.xyte,)) as pool, \
                 open(logfilename, 'rb') as logfile, \
                 tqdm(total=os.path.getsize(logfilename), position=0, desc=logfilename, unit='B',
                      unit_scale=True) as pbar_filepos, \
@@ -279,3 +270,7 @@ class Loader:
 
                 else:
                     pbar_filepos.display(f"Unknown result type: '{type(result)}'")
+
+        # save mapper secrets
+        for prefix, mapper in mappers.items():
+            mapper.save(f"secrets/secrets_{prefix}.csv")
