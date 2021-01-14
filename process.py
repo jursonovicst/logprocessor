@@ -55,9 +55,9 @@ if __name__ == "__main__":
                    escapechar=args.escapechar,
                    nrows=args.nrows,
                    header=None,
-                   # X             X                            X                                                                             X   X     X                                        X        X           X         X                                                                X                                                            X
-                   # 0         1 2 3                     4      5                                                                             6   7 8   9              10                        11       12  13      14  15 16 17                 18      19                                    20                                                 21 22     23
-                   # 127.0.0.1 - - [04/Jan/2021:06:12:23 +0100] "GET http://svc90.main.px.t-online.de/version/v1/app_config_android HTTP/1.1" 304 0 "-" "okhttp/4.9.0" svc90.main.px.t-online.de 0.000130 215 dssmt01 hit - 614 "application/json" 6596557 "session=-,INT-4178154,-,-; HttpOnly" "2003:c7:4f04:bb81:d926:feb9:2593:9643, 127.0.0.1" - TLSv1.2 c
+                   # X             X                            X                                                                              X   X     X                         X        X           X         X                                                                X                                                            X
+                   # 0         1 2 3                     4      5                                                                              6   7 8   9              10         11       12  13      14  15 16 17                 18      19                                    20                                                 21 22     23
+                   # 127.0.0.1 - - [22/Feb/2222:22:22:22 +0100] "GET http://xyz.cdn.de/this/is/the/path?and_this_is_the_query_string HTTP/1.1" 304 0 "-" "okhttp/4.9.0" xyz.cdn.de 0.000130 215 upstrea hit - 614 "application/json" 6596557 "session=-,INT-4178154,-,-; HttpOnly" "2222:22:2222:2222:2222:2222:2222:2222, 127.0.0.1" - TLSv1.2 c
                    usecols=[0, 3, 5, 6, 7, 9, 11, 12, 14, 17, 20, 23],
                    names=['ip', 'timestamp', 'request', 'statuscode', 'contentlength', 'useragent', 'timefirstbyte',
                           'timetoserv', 'hit', 'contenttype', 'xforwardedfor', 'side'],
