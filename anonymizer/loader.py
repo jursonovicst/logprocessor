@@ -129,7 +129,7 @@ class Loader:
         @cached(cache=cls._geocache)
         def coord(ip: str) -> str:
             geodata = geo.get(ip)
-            return f"{geodata['location']['longitude']}:{geodata['location']['latitude']}" if geodata is not None else np.nan
+            return f"{geodata['location']['longitude']}:{geodata['location']['latitude']}" if geodata is not None and 'location' in geodata else np.nan
 
         chunk['coordinates'] = chunk['ip'].map(coord, na_action='ignore')
         chunk.drop(['ip'], axis=1, inplace=True)
