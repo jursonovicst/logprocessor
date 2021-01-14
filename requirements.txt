@@ -1,4 +1,7 @@
-pandas~=1.2.0
-cachetools~=4.2.0
-numpy~=1.19.4
-tqdm~=4.55.1
+pandas
+cachetools
+numpy
+tqdm
+ua-parser
+maxminddb-geolite2
+wheel

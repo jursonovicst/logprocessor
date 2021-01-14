@@ -8,7 +8,7 @@ from cachetools import cached
 from ua_parser import user_agent_parser
 from pandas import HDFStore
 import os
-from contextlib import nullcontext
+import contextlib
 from datetime import timedelta
 from geolite2 import geolite2
 from urllib.parse import urlsplit
@@ -199,7 +199,7 @@ class Loader:
 
         # storage
         if exportcsv:
-            storecm = nullcontext()
+            storecm = contextlib.suppress()
         else:
             storecm = HDFStore(f"{logfilename}.hd5", mode='w')
 
