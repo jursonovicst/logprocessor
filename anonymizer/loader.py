@@ -11,7 +11,7 @@ import contextlib
 from datetime import timedelta
 from geolite2 import geolite2
 from urllib.parse import urlsplit
-from mapper import BaseMapper
+from mapper import BaseMapper, HashDict
 
 
 class Loader:
@@ -21,7 +21,7 @@ class Loader:
 
     # secrets
     timeshiftdays = 0
-    xyte = 0
+    xyte = 1
 
     # local caches for acceleration
     _cachesize = 0
@@ -37,8 +37,8 @@ class Loader:
 
         assert len(cachename) > 0, f"invalid cachename: '{cachename}'"
         assert len(popname) > 0, f"invalid cachename: '{popname}'"
-        cls._cachename = cachename
-        cls._popname = popname
+        cls._cachename = cachename.lower()
+        cls._popname = popname.lower()
 
         assert cachesize >= 0, f"Wrong cachesize: {cachesize}"
         cls._cachesize = int(cachesize)

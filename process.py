@@ -38,14 +38,13 @@ if __name__ == "__main__":
     config.read(args.configfile)
 
     # create logfile reader
-    logreader = Loader(args.nproc, args.cachesize,
-                       config['secrets'].getint('timeshiftdays'),
+    logreader = Loader(args.nproc, args.cachesize, config['secrets'].getint('timeshiftdays'),
                        config['secrets'].getfloat('xyte'))
 
     #                                           [22/Feb/2222:22:22:22
     dateparse = lambda x: datetime.strptime(x, '[%d/%b/%Y:%H:%M:%S')
 
-    # load and process raw logfile
+    # load and process raw logfile, kwargs passed to df.read_csv
     logreader.load(args.logfile, args.cachename, args.popname,
                    exportcsv=(args.exporttype == 'csv'),
                    chunksize=args.chunksize,

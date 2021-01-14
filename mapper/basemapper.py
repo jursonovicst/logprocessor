@@ -17,7 +17,7 @@ class BaseMapper(object):
         :param cache: use the specified store for storing the objects
         """
         self._hashlen = hashlen
-        self._prefix = prefix
+        self._prefix = prefix.lower()
         self._store = {} if store is None else store
         self.cache = LRUCache(maxsize=maxcachesize)
 
