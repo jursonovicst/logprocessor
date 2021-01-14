@@ -23,14 +23,6 @@ class BaseMapper(object):
 
     @cachedmethod(operator.attrgetter('cache'))
     def get(self, key):
-        return self.fetch(key)
-
-    def fetch(self, key) -> str:
-        """
-        Overload this method to implement any own client
-        :param key: key to hash
-        :return: Hash prefixed
-        """
         if self._prefix is None:
             self._store[key] = os.urandom(self._hashlen).hex()
         else:

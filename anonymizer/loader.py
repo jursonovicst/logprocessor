@@ -206,73 +206,74 @@ class Loader:
             storecm = HDFStore(f"{logfilename}.hd5", mode='w')
 
         # create shared memory mappers
-        mappers = {prefix: BaseMapper(prefix=prefix, hashlen=hashlen, store=Manager().dict()) for prefix, hashlen in
-                   [('contenttype', 8), ('cachename', 4), ('popname', 4), ('host', 8), ('coordinates', 8),
-                    ('devicebrand', 4), ('devicefamily', 4), ('devicemodel', 4), ('osfamily', 4), ('uafamily', 4),
-                    ('uamajor', 4), ('path', 16), ('query', 16)]}
+        with Manager() as manager:
+            mappers = {prefix: BaseMapper(prefix=prefix, hashlen=hashlen, store=manager.dict()) for prefix, hashlen in
+                       [('contenttype', 8), ('cachename', 4), ('popname', 4), ('host', 8), ('coordinates', 8),
+                        ('devicebrand', 4), ('devicefamily', 4), ('devicemodel', 4), ('osfamily', 4), ('uafamily', 4),
+                        ('uamajor', 4), ('path', 16), ('query', 16)]}
 
-        # load mapper secrets
-        for prefix, mapper in mappers.items():
-            mapper.load(f"secrets/secrets_{prefix}.csv")
+            # load mapper secrets
+            for prefix, mapper in mappers.items():
+                mapper.load(f"secrets/secrets_{prefix}.csv")
 
-        # start worker processes with initializer (worker parameters and secrets)
-        # open raw logfile
-        # create progress bar for file position
-        # create progress bar for processed lines
-        # create decompressor
-        # create store (if needed)
-        with Pool(self._nproc, Loader.initializer,
-                  (mappers, cachename, popname, self._cachesize, self.timeshiftdays, self.xyte,)) as pool, \
-                open(logfilename, 'rb') as logfile, \
-                tqdm(total=os.path.getsize(logfilename), position=0, desc=logfilename, unit='B',
-                     unit_scale=True) as pbar_filepos, \
-                tqdm(position=1, unit='line', desc='lines', unit_scale=True) as pbar_lines, \
-                BZ2File(logfile) as reader, \
-                storecm as store:
+            # start worker processes with initializer (worker parameters and secrets)
+            # open raw logfile
+            # create progress bar for file position
+            # create progress bar for processed lines
+            # create decompressor
+            # create store (if needed)
+            with Pool(self._nproc, Loader.initializer,
+                      (mappers, cachename, popname, self._cachesize, self.timeshiftdays, self.xyte,)) as pool, \
+                    open(logfilename, 'rb') as logfile, \
+                    tqdm(total=os.path.getsize(logfilename), position=0, desc=logfilename, unit='B',
+                         unit_scale=True) as pbar_filepos, \
+                    tqdm(position=1, unit='line', desc='lines', unit_scale=True) as pbar_lines, \
+                    BZ2File(logfile) as reader, \
+                    storecm as store:
 
-            # for progress bar
-            lastpos = 0
+                # for progress bar
+                lastpos = 0
 
-            # open logfile with pandas, use chunks to distribute the load among workers. Force dtypes
-            chunk_reader = pd.read_csv(reader, **read_csv_args,
-                                       dtype={
-                                           'ip': object,
-                                           'timefirstbyte': float,
-                                           'timetoserv': float
-                                       }
-                                       , iterator=True)  # TODO: add dtypes
+                # open logfile with pandas, use chunks to distribute the load among workers. Force dtypes
+                chunk_reader = pd.read_csv(reader, **read_csv_args,
+                                           dtype={
+                                               'ip': object,
+                                               'timefirstbyte': float,
+                                               'timetoserv': float
+                                           }
+                                           , iterator=True)  # TODO: add dtypes
 
-            # map the logprocessor function
-            for result in pool.imap_unordered(Loader.process, chunk_reader):
-
-                # update progress bar
-                if logfile.tell() > lastpos:
-                    pbar_filepos.update(logfile.tell() - lastpos)
-                    lastpos = logfile.tell()
-
-                # process result
-                if isinstance(result, pd.DataFrame):
-                    if exportcsv:
-                        result.to_csv(f"{logfilename}.csv", mode='a', header=True)
-                    else:
-                        store.append('logs', result)
+                # map the logprocessor function
+                for result in pool.imap_unordered(Loader.process, chunk_reader):
 
                     # update progress bar
-                    pbar_lines.update(result.shape[0])
+                    if logfile.tell() > lastpos:
+                        pbar_filepos.update(logfile.tell() - lastpos)
+                        lastpos = logfile.tell()
 
-                elif isinstance(result, KeyboardInterrupt):
-                    # exit for loop
-                    break
+                    # process result
+                    if isinstance(result, pd.DataFrame):
+                        if exportcsv:
+                            result.to_csv(f"{logfilename}.csv", mode='a', header=True)
+                        else:
+                            store.append('logs', result)
 
-                elif isinstance(result, Exception):
-                    pbar_filepos.display(f"{type(result)} processing chunk: '{result}'")
+                        # update progress bar
+                        pbar_lines.update(result.shape[0])
 
-                elif isinstance(result, str):
-                    pbar_filepos.display(f"Message: {result}")
+                    elif isinstance(result, KeyboardInterrupt):
+                        # exit for loop
+                        break
 
-                else:
-                    pbar_filepos.display(f"Unknown result type: '{type(result)}'")
+                    elif isinstance(result, Exception):
+                        pbar_filepos.display(f"{type(result)} processing chunk: '{result}'")
 
-        # save mapper secrets
-        for prefix, mapper in mappers.items():
-            mapper.save(f"secrets/secrets_{prefix}.csv")
+                    elif isinstance(result, str):
+                        pbar_filepos.display(f"Message: {result}")
+
+                    else:
+                        pbar_filepos.display(f"Unknown result type: '{type(result)}'")
+
+            # save mapper secrets
+            for prefix, mapper in mappers.items():
+                mapper.save(f"secrets/secrets_{prefix}.csv")
