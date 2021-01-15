@@ -119,7 +119,7 @@ class Loader:
             chunk.drop(['request'], axis=1, inplace=True)
 
             # parse url, skip schema, fragment
-            dummy, chunk['host'], chunk['path'], chunk['query'], dummy2 = zip(*chunk['url'].map(urlsplit))
+            dummy_schema, chunk['host'], chunk['path'], dummy_query, dummy2 = zip(*chunk['url'].map(urlsplit))
             chunk.drop(['url'], axis=1, inplace=True)
 
             #########################
@@ -159,7 +159,7 @@ class Loader:
 
             # substitute: map values to random hashes
             for prefix in ['contenttype', 'cachename', 'popname', 'host', 'coordinates', 'devicebrand',
-                           'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path', 'query']:
+                           'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path']:
                 assert prefix in Loader.mappers, f"Mapper prefix issue: '{prefix}' not found in '{Loader.mappers}'"
                 chunk[prefix] = chunk[prefix].map(Loader.mappers[prefix].get, na_action='ignore')
 
@@ -175,7 +175,7 @@ class Loader:
             # set index
             chunk.set_index(['timestamp', 'statuscode', 'method', 'protocol',
                              'hit', 'contenttype', 'cachename', 'popname', 'host', 'coordinates', 'devicebrand',
-                             'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path', 'query'],
+                             'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path'],
                             inplace=True)
 
             assert set(chunk.columns) == set(
@@ -210,7 +210,7 @@ class Loader:
             mappers = {prefix: BaseMapper(prefix=prefix, hashlen=hashlen, store=manager.dict()) for prefix, hashlen in
                        [('contenttype', 8), ('cachename', 4), ('popname', 4), ('host', 8), ('coordinates', 8),
                         ('devicebrand', 4), ('devicefamily', 4), ('devicemodel', 4), ('osfamily', 4), ('uafamily', 4),
-                        ('uamajor', 4), ('path', 16), ('query', 16)]}
+                        ('uamajor', 4), ('path', 16)]}
 
             # load mapper secrets
             for prefix, mapper in mappers.items():
