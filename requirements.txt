@@ -3,5 +3,7 @@ cachetools
 numpy
 tqdm
 ua-parser
-maxminddb-geolite2
 wheel
+maxminddb-geolite2
+numexpr
+bottleneck
