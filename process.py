@@ -54,6 +54,7 @@ if __name__ == "__main__":
                    escapechar=args.escapechar,
                    nrows=args.nrows,
                    header=None,
+                   error_bad_lines=False,
                    # X             X                            X                                                                              X   X     X                         X        X           X         X                                                                X                                                            X
                    # 0         1 2 3                     4      5                                                                              6   7 8   9              10         11       12  13      14  15 16 17                 18      19                                    20                                                 21 22     23
                    # 127.0.0.1 - - [22/Feb/2222:22:22:22 +0100] "GET http://xyz.cdn.de/this/is/the/path?and_this_is_the_query_string HTTP/1.1" 304 0 "-" "okhttp/4.9.0" xyz.cdn.de 0.000130 215 upstrea hit - 614 "application/json" 6596557 "session=-,INT-4178154,-,-; HttpOnly" "2222:22:2222:2222:2222:2222:2222:2222, 127.0.0.1" - TLSv1.2 c
