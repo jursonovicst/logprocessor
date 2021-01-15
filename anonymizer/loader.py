@@ -73,12 +73,6 @@ class Loader:
                     :
                 raise SyntaxError(f"Required column(s) not found: {chunk.columns}")
 
-            if chunk.ip.dtype != object or \
-                    chunk.xforwardedfor.dtype != object or \
-                    chunk.timetoserv.dtype != float or \
-                    chunk.statuscode.dtype != np.int64:
-                raise SyntaxError(f"dtype(s) incorrect: {chunk.dtypes}")
-
             if _debug: print(chunk.head(5))
 
             #########################
@@ -235,13 +229,7 @@ class Loader:
                 lastpos = 0
 
                 # open logfile with pandas, use chunks to distribute the load among workers. Force dtypes
-                chunk_reader = pd.read_csv(reader, **read_csv_args,
-                                           dtype={
-                                               'ip': object,
-                                               'timefirstbyte': float,
-                                               'timetoserv': float
-                                           }
-                                           , iterator=True)  # TODO: add dtypes
+                chunk_reader = pd.read_csv(reader, **read_csv_args, iterator=True)
 
                 # map the logprocessor function
                 for result in pool.imap_unordered(Loader.process, chunk_reader):
