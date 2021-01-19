@@ -5,13 +5,14 @@ from bz2 import BZ2File
 import numpy as np
 from cachetools import cached
 from ua_parser import user_agent_parser
-from pandas import HDFStore
 import os
-import contextlib
 from datetime import timedelta
 from geolite2 import geolite2
 from urllib.parse import urlsplit
-from mapper import BaseMapper, HashDict
+from mapper import BaseMapper
+from io import StringIO
+from itertools import islice
+from datetime import datetime
 
 
 class Loader:
@@ -23,6 +24,9 @@ class Loader:
     timeshiftdays = 0
     xyte = 1
 
+    # csv_reader kwargs
+    _read_csv_args = {}
+
     # local caches for acceleration
     _cachesize = 0
     _geocache = None
@@ -32,7 +36,8 @@ class Loader:
     mappers = {}
 
     @classmethod
-    def initializer(cls, mappers: dict, cachename: str, popname: str, cachesize: int, timeshiftdays: int, xyte: float):
+    def initializer(cls, mappers: dict, cachename: str, popname: str, cachesize: int, timeshiftdays: int, xyte: float,
+                    read_csv_args: dict):
         cls.mappers = mappers
 
         assert len(cachename) > 0, f"invalid cachename: '{cachename}'"
@@ -49,8 +54,15 @@ class Loader:
         cls.timeshiftdays = int(timeshiftdays)
         cls.xyte = float(xyte)
 
+        assert isinstance(read_csv_args, dict), f"wrong type for read_csv_args: '{type(read_csv_args)}'"
+        dateformat = read_csv_args.pop('dateformat')
+        cls._read_csv_args = read_csv_args
+        cls._read_csv_args['date_parser'] = lambda x: datetime.strptime(x, dateformat)
+
     @classmethod
-    def process(cls, chunk: pd.DataFrame):
+    def process(cls, data: bytes):
+        # open logfile with pandas, use chunks to distribute the load among workers. Force dtypes
+        chunk = pd.read_csv(StringIO(data.decode(encoding='utf8')), **cls._read_csv_args)
 
         _debug = False
 
@@ -191,14 +203,7 @@ class Loader:
         self.timeshiftdays = timeshiftdays
         self.xyte = xyte
 
-    def load(self, logfilename: str, cachename: str, popname: str, exportcsv=True, **read_csv_args):
-
-        # storage
-        if exportcsv:
-            storecm = contextlib.suppress()
-        else:
-            storecm = HDFStore(f"{logfilename}.hd5", mode='w')
-
+    def load(self, logfilename: str, cachename: str, popname: str, chunksize: int, **read_csv_args):
         # create shared memory mappers
         with Manager() as manager:
             mappers = {prefix: BaseMapper(prefix=prefix, hashlen=hashlen, store=manager.dict()) for prefix, hashlen in
@@ -214,25 +219,29 @@ class Loader:
             # open raw logfile
             # create progress bar for file position
             # create progress bar for processed lines
-            # create decompressor
-            # create store (if needed)
-            with Pool(self._nproc, Loader.initializer,
-                      (mappers, cachename, popname, self._cachesize, self.timeshiftdays, self.xyte,)) as pool, \
-                    open(logfilename, 'rb') as logfile, \
+            with open(logfilename, 'rb') as logfile, \
+                    BZ2File(logfile) as logreader, \
                     tqdm(total=os.path.getsize(logfilename), position=0, desc=logfilename, unit='B',
                          unit_scale=True) as pbar_filepos, \
                     tqdm(position=1, unit='line', desc='lines', unit_scale=True) as pbar_lines, \
-                    BZ2File(logfile) as reader, \
-                    storecm as store:
+                    Pool(self._nproc, Loader.initializer,
+                         (mappers, cachename, popname, self._cachesize, self.timeshiftdays, self.xyte,
+                          read_csv_args,)) as pool:
 
                 # for progress bar
                 lastpos = 0
 
-                # open logfile with pandas, use chunks to distribute the load among workers. Force dtypes
-                chunk_reader = pd.read_csv(reader, **read_csv_args, iterator=True)
+                # slice elements from an iterable
+                def slicer(n, iterable):
+                    it = iter(iterable)
+                    while True:
+                        chunk = b"".join(islice(it, n))
+                        if not chunk:
+                            return
+                        yield chunk
 
-                # map the logprocessor function
-                for result in pool.imap_unordered(Loader.process, chunk_reader):
+                # map chunks (group of lines to the workers)
+                for result in pool.imap(Loader.process, slicer(chunksize, logreader)):
 
                     # update progress bar
                     if logfile.tell() > lastpos:
@@ -241,10 +250,8 @@ class Loader:
 
                     # process result
                     if isinstance(result, pd.DataFrame):
-                        if exportcsv:
-                            result.to_csv(f"{logfilename}.csv", mode='a', header=True)
-                        else:
-                            store.append('logs', result)
+                        # export
+                        result.to_csv(f"{logfilename}.csv", mode='a', header=True)
 
                         # update progress bar
                         pbar_lines.update(result.shape[0])

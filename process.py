@@ -1,15 +1,14 @@
 import argparse
 from anonymizer import Loader
 import multiprocessing
-from datetime import datetime
 import configparser
 
 parser = argparse.ArgumentParser()
 parser.add_argument('logfile', type=str)
 parser.add_argument('cachename', type=str)
 parser.add_argument('popname', type=str)
-parser.add_argument('--exporttype', type=str, choices=['csv', 'hdf5'], default='csv',
-                    help="Export file format (default: %(default)s)")
+# parser.add_argument('--exporttype', type=str, choices=['csv', 'hdf5'], default='csv',
+#                    help="Export file format (default: %(default)s)")
 parser.add_argument('--nproc', type=int, default=max(2, multiprocessing.cpu_count() - 2),
                     help="Number of worker processes to start (default: %(default)s)")
 parser.add_argument('--cachesize', type=int, default=1000, help="Per process local cache size (default: %(default)s)")
@@ -18,6 +17,8 @@ parser.add_argument('--nrows', type=int, default=None,
                     help="Number of rows of file to read. Useful for reading pieces of large files (default: %(default)s)")
 parser.add_argument('--chunksize', type=int, default=10000,
                     help="Chunk (lines processed together) size (default: %(default)s)")
+parser.add_argument('--encoding', type=str, default='utf8',
+                    help="Encoding to use for UTF when reading/writing (ex. ‘utf-8’). List of Python standard encodings (default: %(default)s)")
 parser.add_argument('--delimiter', type=str, default=' ',
                     help="Delimiter to use. If sep is None, the C engine cannot automatically detect the separator, but the Python parsing engine can, meaning the latter will be used and automatically detect the separator by Python’s builtin sniffer tool, csv.Sniffer. In addition, separators longer than 1 character and different from '\s+' will be interpreted as regular expressions and will also force the use of the Python parsing engine. Note that regex delimiters are prone to ignoring quoted data. Regex example: '\r\t'. (default: %(default)s)")
 parser.add_argument('--quotechar', type=str, default='"',
@@ -41,13 +42,9 @@ if __name__ == "__main__":
     logreader = Loader(args.nproc, args.cachesize, config['secrets'].getint('timeshiftdays'),
                        config['secrets'].getfloat('xyte'))
 
-    #                                           [22/Feb/2222:22:22:22
-    dateparse = lambda x: datetime.strptime(x, '[%d/%b/%Y:%H:%M:%S')
-
     # load and process raw logfile, kwargs passed to df.read_csv
-    logreader.load(args.logfile, args.cachename, args.popname,
-                   exportcsv=(args.exporttype == 'csv'),
-                   chunksize=args.chunksize,
+    logreader.load(args.logfile, args.cachename, args.popname, args.chunksize,
+                   encoding=args.encoding,
                    delimiter=args.delimiter,
                    quotechar=args.quotechar,
                    na_values=args.navalues,
@@ -62,7 +59,8 @@ if __name__ == "__main__":
                    names=['ip', 'timestamp', 'request', 'statuscode', 'contentlength', 'useragent', 'timefirstbyte',
                           'timetoserv', 'hit', 'contenttype', 'xforwardedfor', 'side'],
                    parse_dates=['timestamp'],
-                   date_parser=dateparse
+                   #           [22/Feb/2222:22:22:22
+                   dateformat='[%d/%b/%Y:%H:%M:%S'
                    )
 
     print(f"logfile {args.logfile} anonymization complete")
