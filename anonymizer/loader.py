@@ -1,7 +1,7 @@
 import pandas as pd
 from multiprocessing import Pool, Manager
 from tqdm.auto import tqdm
-from bz2 import BZ2File
+import bz2
 import numpy as np
 from cachetools import cached
 from ua_parser import user_agent_parser
@@ -248,7 +248,7 @@ class Loader:
             # create progress bar for file position
             # create progress bar for processed lines
             with open(logfilename, 'rb') as logfile, \
-                    BZ2File(logfile) as logreader, \
+                    bz2.BZ2File(logfile) as logreader, \
                     tqdm(total=os.path.getsize(logfilename), position=0, desc=logfilename, unit='B',
                          unit_scale=True) as pbar_filepos, \
                     tqdm(position=1, unit='line', desc='lines', unit_scale=True) as pbar_lines, \
@@ -274,34 +274,35 @@ class Loader:
 
                         yield chunk
 
-                # map chunks (group of lines to the workers)
-                for result in pool.imap(Loader.process, slicer(chunksize, maxlines, logreader)):
-
-                    # update progress bar
-                    if logfile.tell() > lastpos:
-                        pbar_filepos.update(logfile.tell() - lastpos)
-                        lastpos = logfile.tell()
-
-                    # process result
-                    if isinstance(result, pd.DataFrame):
-                        # export
-                        result.to_csv(f"{logfilename}.csv", mode='a', header=True)
+                with bz2.open(f"{logfilename}.ano.bz2", "wb") as logwriter:
+                    # map chunks (group of lines to the workers)
+                    for result in pool.imap(Loader.process, slicer(chunksize, maxlines, logreader)):
 
                         # update progress bar
-                        pbar_lines.update(result.shape[0])
+                        if logfile.tell() > lastpos:
+                            pbar_filepos.update(logfile.tell() - lastpos)
+                            lastpos = logfile.tell()
 
-                    elif isinstance(result, KeyboardInterrupt):
-                        # exit for loop
-                        break
+                        # process result
+                        if isinstance(result, pd.DataFrame):
+                            # export
+                            result.to_csv(logwriter, header=True)
 
-                    elif isinstance(result, Exception):
-                        pbar_filepos.display(f"{type(result)} processing chunk: '{result}'")
+                            # update progress bar
+                            pbar_lines.update(result.shape[0])
 
-                    elif isinstance(result, str):
-                        pbar_filepos.display(f"Message: {result}")
+                        elif isinstance(result, KeyboardInterrupt):
+                            # exit for loop
+                            break
 
-                    else:
-                        pbar_filepos.display(f"Unknown result type: '{type(result)}'")
+                        elif isinstance(result, Exception):
+                            pbar_filepos.display(f"{type(result)} processing chunk: '{result}'")
+
+                        elif isinstance(result, str):
+                            pbar_filepos.display(f"Message: {result}")
+
+                        else:
+                            pbar_filepos.display(f"Unknown result type: '{type(result)}'")
 
             # save mapper secrets
             for prefix, mapper in mappers.items():
