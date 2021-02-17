@@ -230,7 +230,7 @@ class Loader:
         self.timeshiftdays = timeshiftdays
         self.xyte = xyte
 
-    def load(self, logfilename: str, cachename: str, popname: str, chunksize: int, **read_csv_args):
+    def load(self, logfilename: str, cachename: str, popname: str, chunksize: int, maxlines: int, **read_csv_args):
         # create shared memory mappers
         with Manager() as manager:
             mappers = {prefix: BaseMapper(prefix=prefix, hashlen=hashlen, store=manager.dict()) for prefix, hashlen in
@@ -259,17 +259,23 @@ class Loader:
                 # for progress bar
                 lastpos = 0
 
-                # slice elements from an iterable
-                def slicer(n, iterable):
+                # slice elements from an iterable, use maxitems=-1 for no limit
+                def slicer(n, maxitems, iterable):
                     it = iter(iterable)
                     while True:
                         chunk = b"".join(islice(it, n))
+                        maxitems = max(0, maxitems - n)
                         if not chunk:
+                            # no more items in the iterable
                             return
+                        if maxitems == 0:
+                            # reached maxitems
+                            return
+
                         yield chunk
 
                 # map chunks (group of lines to the workers)
-                for result in pool.imap(Loader.process, slicer(chunksize, logreader)):
+                for result in pool.imap(Loader.process, slicer(chunksize, maxlines, logreader)):
 
                     # update progress bar
                     if logfile.tell() > lastpos:
