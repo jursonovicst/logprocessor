@@ -1,7 +1,8 @@
 import operator
-from cachetools import LRUCache, LFUCache, cachedmethod
+from cachetools import LRUCache, cachedmethod
 import os
 import pandas as pd
+import numpy as np
 
 
 class BaseMapper(object):
@@ -13,8 +14,8 @@ class BaseMapper(object):
         """
         :param hashlen: length of hash generated
         :param prefix: prefix returned values
-        :param cachesize: size of the accelerator cache
-        :param cache: use the specified store for storing the objects
+        :param store: use the specified store for storing the objects
+        :param maxcachesize: size of the accelerator cache
         """
         self._hashlen = hashlen
         self._prefix = prefix.lower()
@@ -23,6 +24,10 @@ class BaseMapper(object):
 
     @cachedmethod(operator.attrgetter('cache'))
     def get(self, key):
+        # do not map NaN/None values
+        if key is None or key == np.nan:
+            return key
+
         if self._prefix is None:
             self._store[key] = os.urandom(self._hashlen).hex()
         else:

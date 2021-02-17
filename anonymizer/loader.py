@@ -13,6 +13,7 @@ from mapper import BaseMapper
 from io import StringIO
 from itertools import islice
 from datetime import datetime
+import logging
 
 
 class Loader:
@@ -75,13 +76,14 @@ class Loader:
             # check TODO: add missing
             if 'ip' not in chunk.columns \
                     or 'xforwardedfor' not in chunk.columns \
-                    or 'timestamp' not in chunk.columns \
+                    or '#timestamp' not in chunk.columns \
                     or 'contenttype' not in chunk.columns \
                     or 'ip' not in chunk.columns \
                     or 'request' not in chunk.columns \
                     or 'side' not in chunk.columns \
                     or 'statuscode' not in chunk.columns \
                     or 'timetoserv' not in chunk.columns \
+                    or 'sessioncookie' not in chunk.columns \
                     :
                 raise SyntaxError(f"Required column(s) not found: {chunk.columns}")
 
@@ -125,8 +127,24 @@ class Loader:
             chunk.drop(['request'], axis=1, inplace=True)
 
             # parse url, skip schema, fragment
-            dummy_schema, chunk['host'], chunk['path'], dummy_query, dummy2 = zip(*chunk['url'].map(urlsplit))
+            dummy_schema, chunk['host'], chunk['path'], dummy_query, dummy_fragment = zip(*chunk['url'].map(urlsplit))
             chunk.drop(['url'], axis=1, inplace=True)
+
+            # session cookie
+            dummy = chunk['sessioncookie'].str.extract(
+                r"session=(?:-|([^,]+)),(?:-|([^,]+)),(?:-|([^,]+)),(?:-|([^,;]+))", expand=True)
+            chunk['uid'] = dummy[0]
+            chunk['sid'] = dummy[1]
+            chunk.drop(['sessioncookie'], axis=1, inplace=True)
+
+            # channel number (.fillna().sum() takes care of the OR case in the regexp)
+            chunk['livechannel'] = chunk['path'].str.extract(r'PLTV/88888888/\d+/(\d+)/|([^/]+)\.isml',
+                                                             expand=False).fillna('').sum(axis=1)
+
+            # contentpackage, assetid
+            dummy = chunk['path'].str.extract(r"/(\d{18,})/(\d{16,})/")
+            chunk['contentpackage'] = dummy[0]
+            chunk['assetnumber'] = dummy[1]
 
             #########################
             # enrich - geoip, use local cache for performance
@@ -161,27 +179,36 @@ class Loader:
             if _debug: print(chunk.head(5))
 
             #########################
+            # enrich - streaming protocol
+
+            chunk['manifest'] = chunk['path'].str.match(r'(?:\.isml?/Manifest|\.mpd|\.m3u8)$', case=False)
+            chunk['fragment'] = chunk['path'].str.match(
+                r'(?:\.m4[avi]|\.ts|\.ism[av]|\.mp[4a]|/(?:Fragments|KeyFrames)\(.*\))$', case=False)
+
+            #########################
             # anonymize
 
             # substitute: map values to random hashes
-            for prefix in ['contenttype', 'cachename', 'popname', 'host', 'coordinates', 'devicebrand',
-                           'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path']:
+            for prefix in ['cachename', 'popname', 'host', 'coordinates', 'devicebrand',
+                           'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path',
+                           'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid']:
                 assert prefix in Loader.mappers, f"Mapper prefix issue: '{prefix}' not found in '{Loader.mappers}'"
                 chunk[prefix] = chunk[prefix].map(Loader.mappers[prefix].get, na_action='ignore')
 
             if _debug: print(chunk.head(5))
 
             # shift time
-            chunk.timestamp += timedelta(days=cls.timeshiftdays)
+            chunk['#timestamp'] += timedelta(days=cls.timeshiftdays)
 
             # convert byte to xyte
             chunk.contentlength = chunk.contentlength.divide(cls.xyte)
 
             #########################
             # set index
-            chunk.set_index(['timestamp', 'statuscode', 'method', 'protocol',
+            chunk.set_index(['#timestamp', 'statuscode', 'method', 'protocol',
                              'hit', 'contenttype', 'cachename', 'popname', 'host', 'coordinates', 'devicebrand',
-                             'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path'],
+                             'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path', 'manifest',
+                             'fragment', 'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid'],
                             inplace=True)
 
             assert set(chunk.columns) == set(
@@ -192,7 +219,7 @@ class Loader:
             return chunk
 
         except Exception as e:
-            return e
+            logging.exception(e)
 
     def __init__(self, nproc: int, cachesize: int, timeshiftdays: int, xyte: float):
         # worker parameters
@@ -207,9 +234,10 @@ class Loader:
         # create shared memory mappers
         with Manager() as manager:
             mappers = {prefix: BaseMapper(prefix=prefix, hashlen=hashlen, store=manager.dict()) for prefix, hashlen in
-                       [('contenttype', 8), ('cachename', 4), ('popname', 4), ('host', 8), ('coordinates', 8),
+                       [('cachename', 4), ('popname', 4), ('host', 8), ('coordinates', 8),
                         ('devicebrand', 4), ('devicefamily', 4), ('devicemodel', 4), ('osfamily', 4), ('uafamily', 4),
-                        ('uamajor', 4), ('path', 16)]}
+                        ('uamajor', 4), ('path', 16), ('livechannel', 4), ('contentpackage', 8), ('assetnumber', 8),
+                        ('uid', 12), ('sid', 12)]}
 
             # load mapper secrets
             for prefix, mapper in mappers.items():
