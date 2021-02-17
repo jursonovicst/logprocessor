@@ -264,13 +264,15 @@ class Loader:
                     it = iter(iterable)
                     while True:
                         chunk = b"".join(islice(it, n))
-                        maxitems = max(0, maxitems - n)
                         if not chunk:
                             # no more items in the iterable
                             return
-                        if maxitems == 0:
-                            # reached maxitems
-                            return
+                        # if maxitems is set
+                        if maxitems != -1:
+                            maxitems = max(0, maxitems - n)
+                            if maxitems == 0:
+                                # reached maxitems
+                                return
 
                         yield chunk
 
