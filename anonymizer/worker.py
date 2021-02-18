@@ -224,7 +224,7 @@ class Worker(Process):
             self._logger.info("interrupt")
 
         except Exception:
-            self._logger.exception()
+            self._logger.exception("Error")
 
     def eof(self):
         self._eof.set()

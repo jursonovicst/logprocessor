@@ -4,6 +4,7 @@ import bz2
 import os
 from itertools import islice
 import logging
+import platform
 
 
 class Reader(Process):
@@ -25,7 +26,8 @@ class Reader(Process):
                     bz2.BZ2File(logfile) as logreader, \
                     tqdm(total=os.path.getsize(self._logfilename), position=0, desc=self._logfilename, unit='B',
                          unit_scale=True) as pbar_filepos, \
-                    tqdm(position=1, unit='line', desc=self._logfilename, unit_scale=True) as pbar_lines:
+                    tqdm(position=1, unit='line', desc=self._logfilename, unit_scale=True) as pbar_lines, \
+                    tqdm(position=2) as pbar_queue:
 
                 # for progress bar
                 lastpos = 0
@@ -40,6 +42,8 @@ class Reader(Process):
                         pbar_filepos.update(logfile.tell() - lastpos)
                         lastpos = logfile.tell()
                     pbar_lines.update(self._batchsize)
+                    if platform.system() != 'Darwin':
+                        pbar_queue.display(f"read queue: {self._queue.qsize()}")
 
                     # send them for the workers, this may block for backpressure
                     self._queue.put(batch)
@@ -57,7 +61,7 @@ class Reader(Process):
         except KeyboardInterrupt:
             self._logger.info("Interrupt")
         except Exception:
-            self._logger.exception()
+            self._logger.exception("Error")
         finally:
             self._queue.close()
 
