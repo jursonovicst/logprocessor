@@ -84,7 +84,7 @@ if __name__ == "__main__":
                        parse_dates=['#timestamp'],
                        #           [22/Feb/2222:22:22:22s
                        dateformat='[%d/%b/%Y:%H:%M:%S'
-                       ) for i in range(0, 10)]
+                       ) for i in range(0, args.nproc)]
 
             # good to go
             for worker in workers:
