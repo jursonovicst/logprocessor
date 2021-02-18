@@ -232,6 +232,8 @@ class Worker(Process):
 
                     pbar_lines.update(chunk.shape[0])
 
+                pbar_lines.display(f"***DONE***")
+
         except KeyboardInterrupt:
             self._logger.info("interrupt")
 
