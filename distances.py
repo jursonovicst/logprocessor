@@ -8,7 +8,7 @@ parser.add_argument('coordinates', type=str)
 parser.add_argument('output', type=str)
 parser.add_argument('--resolution', type=int, default=5,
                     help="in km, distance values rounded up to this (default: %(default)s)")
-parser.add_argument('--cap', type=int, default=50,
+parser.add_argument('--cap', type=int, default=150,
                     help="in km, distances over this value dropped (default: %(default)s)")
 
 
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     df['lat'] = dummy[0].astype(float)
     df['lon'] = dummy[1].astype(float)
     df.drop(['coord'], axis=1, inplace=True)
-    print(df.values)
+    print(df)
 
     # create a matrix with nan
     distances = pd.DataFrame(
