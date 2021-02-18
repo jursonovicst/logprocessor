@@ -64,7 +64,7 @@ if __name__ == "__main__":
             # create progress bar for file position
             # create progress bar for processed lines
             workers = [
-                Worker(f"Worker-{i}", f"{args.logfile}.ano-{i}.bz2", reader.queue, mappers, args.cachename,
+                Worker(i, f"{args.logfile}.ano-{i}.bz2", reader.queue, mappers, args.cachename,
                        args.popname, config['secrets'].getint('timeshiftdays'), config['secrets'].getfloat('xyte'),
                        args.cachesize,
                        encoding=args.encoding,

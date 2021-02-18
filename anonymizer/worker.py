@@ -11,16 +11,21 @@ from geolite2 import geolite2
 from urllib.parse import urlsplit
 from datetime import datetime
 import bz2
+import os
+from tqdm.auto import tqdm
+
+os.environ['NUMEXPR_MAX_THREADS'] = '100'
 
 
 class Worker(Process):
-    def __init__(self, name: str, logfilename: str, input: Queue, mappers: dict, cachename: str,
+    def __init__(self, no: int, logfilename: str, input: Queue, mappers: dict, cachename: str,
                  popname: str, timeshiftdays: int, xyte: float, cachesize: int, **read_csv_args):
-        super().__init__()
+        super().__init__(name=f"Worker-{no}")
+        self._no = no
         self._logfilename = logfilename
         self._input = input
         self._read_csv_args = read_csv_args
-        self._logger = logging.getLogger(name)
+        self._logger = logging.getLogger(self.name)
         self._eof = Event()
 
         self._mappers = mappers
@@ -49,7 +54,8 @@ class Worker(Process):
             dateformat = self._read_csv_args.pop('dateformat')
             self._read_csv_args['date_parser'] = lambda x: datetime.strptime(x, dateformat)
 
-            with bz2.BZ2File(self._logfilename, mode='w') as logwriter:
+            with bz2.BZ2File(self._logfilename, mode='w') as logwriter, \
+                    tqdm(position=3 + self._no, unit='line', desc=self.name, unit_scale=True) as pbar_lines:
 
                 while True:
 
@@ -223,6 +229,8 @@ class Worker(Process):
                     buff = StringIO()
                     chunk.to_csv(buff, header=True)
                     logwriter.write(buff.getvalue().encode('utf-8'))
+
+                    pbar_lines.update(chunk.shape[0])
 
         except KeyboardInterrupt:
             self._logger.info("interrupt")
