@@ -3,7 +3,7 @@ import multiprocessing
 import configparser
 from multiprocessing import Manager
 from mapper import BaseMapper
-from anonymizer import Reader, Writer, Worker
+from anonymizer import Reader, Worker
 import logging
 
 parser = argparse.ArgumentParser()
@@ -58,15 +58,15 @@ if __name__ == "__main__":
 
             # create reader and writer processes
             reader = Reader(args.logfile, args.chunksize, args.maxlines, args.queuelen)
-            writer = Writer(f"{args.logfile}.ano.bz2", args.chunksize, args.queuelen)
 
             # start worker processes with initializer (worker parameters and secrets)
             # open raw logfile
             # create progress bar for file position
             # create progress bar for processed lines
             workers = [
-                Worker(f"Worker-{i}", reader.queue, writer.queue, mappers, args.cachename, args.popname,
-                       config['secrets'].getint('timeshiftdays'), config['secrets'].getfloat('xyte'), args.cachesize,
+                Worker(f"Worker-{i}", f"{args.logfile}.ano-{i}.bz2", reader.queue, mappers, args.cachename,
+                       args.popname, config['secrets'].getint('timeshiftdays'), config['secrets'].getfloat('xyte'),
+                       args.cachesize,
                        encoding=args.encoding,
                        delimiter=args.delimiter,
                        quotechar=args.quotechar,
@@ -87,7 +87,6 @@ if __name__ == "__main__":
                        ) for i in range(0, 10)]
 
             # good to go
-            writer.start()
             for worker in workers:
                 worker.start()
             reader.start()
@@ -102,10 +101,6 @@ if __name__ == "__main__":
                 worker.eof()
             for worker in workers:
                 worker.join()
-
-            # all work done, signal EOF
-            writer.queue.put(None)
-            writer.join()
 
             # save mapper secrets
             for prefix, mapper in mappers.items():

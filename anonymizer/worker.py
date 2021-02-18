@@ -10,14 +10,15 @@ from datetime import timedelta
 from geolite2 import geolite2
 from urllib.parse import urlsplit
 from datetime import datetime
+import bz2
 
 
 class Worker(Process):
-    def __init__(self, name: str, input: Queue, output: Queue, mappers: dict, cachename: str,
+    def __init__(self, name: str, logfilename: str, input: Queue, mappers: dict, cachename: str,
                  popname: str, timeshiftdays: int, xyte: float, cachesize: int, **read_csv_args):
         super().__init__()
+        self._logfilename = logfilename
         self._input = input
-        self._output = output
         self._read_csv_args = read_csv_args
         self._logger = logging.getLogger(name)
         self._eof = Event()
@@ -48,177 +49,180 @@ class Worker(Process):
             dateformat = self._read_csv_args.pop('dateformat')
             self._read_csv_args['date_parser'] = lambda x: datetime.strptime(x, dateformat)
 
-            while True:
+            with bz2.BZ2File(self._logfilename, mode='w') as logwriter:
 
-                # wait for a task
-                try:
-                    batch = self._input.get(block=True, timeout=0.25)
-                except Empty:
-                    if self._eof.is_set():
-                        # no job, and the EOF reached, no hope to get a task, exit
-                        break
-                    else:
-                        # no job, but EOF not set, reade is behind, expect new tasks
-                        continue
+                while True:
 
-                # read csv
-                chunk = pd.read_csv(StringIO(batch.decode(encoding='utf8')), **self._read_csv_args)
+                    # wait for a task
+                    try:
+                        batch = self._input.get(block=True, timeout=0.25)
+                    except Empty:
+                        if self._eof.is_set():
+                            # no job, and the EOF reached, no hope to get a task, exit
+                            break
+                        else:
+                            # no job, but EOF not set, reade is behind, expect new tasks
+                            continue
 
-                if self._logger.level == logging.DEBUG:
-                    pd.set_option('display.max_columns', None)
-                    pd.set_option('display.max_colwidth', -1)
+                    # read csv
+                    chunk = pd.read_csv(StringIO(batch.decode(encoding='utf8')), **self._read_csv_args)
 
-                #########################
-                # check TODO: add missing
-                if 'ip' not in chunk.columns \
-                        or 'xforwardedfor' not in chunk.columns \
-                        or '#timestamp' not in chunk.columns \
-                        or 'contenttype' not in chunk.columns \
-                        or 'ip' not in chunk.columns \
-                        or 'request' not in chunk.columns \
-                        or 'side' not in chunk.columns \
-                        or 'statuscode' not in chunk.columns \
-                        or 'timetoserv' not in chunk.columns \
-                        or 'sessioncookie' not in chunk.columns \
-                        :
-                    raise SyntaxError(f"Required column(s) not found: {chunk.columns}")
+                    if self._logger.level == logging.DEBUG:
+                        pd.set_option('display.max_columns', None)
+                        pd.set_option('display.max_colwidth', -1)
 
-                self._logger.debug(chunk.head(5))
+                    #########################
+                    # check TODO: add missing
+                    if 'ip' not in chunk.columns \
+                            or 'xforwardedfor' not in chunk.columns \
+                            or '#timestamp' not in chunk.columns \
+                            or 'contenttype' not in chunk.columns \
+                            or 'ip' not in chunk.columns \
+                            or 'request' not in chunk.columns \
+                            or 'side' not in chunk.columns \
+                            or 'statuscode' not in chunk.columns \
+                            or 'timetoserv' not in chunk.columns \
+                            or 'sessioncookie' not in chunk.columns \
+                            :
+                        raise SyntaxError(f"Required column(s) not found: {chunk.columns}")
 
-                #########################
-                # filter
+                    self._logger.debug(chunk.head(5))
 
-                # drop non downstream lines
-                chunk.drop(chunk.loc[chunk['side'] != 'c'].index, inplace=True)
-                chunk.drop(['side'], axis=1, inplace=True)
+                    #########################
+                    # filter
 
-                # add constant values
-                chunk['cachename'] = self._cachename
-                chunk['popname'] = self._popname
+                    # drop non downstream lines
+                    chunk.drop(chunk.loc[chunk['side'] != 'c'].index, inplace=True)
+                    chunk.drop(['side'], axis=1, inplace=True)
 
-                #########################
-                # parse
+                    # add constant values
+                    chunk['cachename'] = self._cachename
+                    chunk['popname'] = self._popname
 
-                # split xforwarded for, keep the first IP
-                chunk.xforwardedfor = chunk.xforwardedfor.str.split(",", n=1, expand=True)[0]
+                    #########################
+                    # parse
 
-                # check if all public
-                assert True  # TODO: implement
-                self._logger.debug(chunk.head(5))
+                    # split xforwarded for, keep the first IP
+                    chunk.xforwardedfor = chunk.xforwardedfor.str.split(",", n=1, expand=True)[0]
 
-                # overwrite ip with xforwardedfor if it is 127.0.0.1 (TLS termination is from localhost)
-                mask = chunk['ip'] == '127.0.0.1'
-                chunk.loc[mask, 'ip'] = chunk.loc[mask, 'xforwardedfor']
-                self._logger.debug(chunk.head(5))
+                    # check if all public
+                    assert True  # TODO: implement
+                    self._logger.debug(chunk.head(5))
 
-                # drop xforwardedfor
-                chunk.drop(['xforwardedfor'], axis=1, inplace=True)
-                self._logger.debug(chunk.head(5))
+                    # overwrite ip with xforwardedfor if it is 127.0.0.1 (TLS termination is from localhost)
+                    mask = chunk['ip'] == '127.0.0.1'
+                    chunk.loc[mask, 'ip'] = chunk.loc[mask, 'xforwardedfor']
+                    self._logger.debug(chunk.head(5))
 
-                # convert timetoserv unit from ms to sec
-                chunk['timetoserv'] /= 1000000
+                    # drop xforwardedfor
+                    chunk.drop(['xforwardedfor'], axis=1, inplace=True)
+                    self._logger.debug(chunk.head(5))
 
-                # split request line
-                chunk['method'], chunk['url'], chunk['protocol'] = zip(*chunk['request'].str.split(' ', n=2))
-                chunk.drop(['request'], axis=1, inplace=True)
+                    # convert timetoserv unit from ms to sec
+                    chunk['timetoserv'] /= 1000000
 
-                # parse url, skip schema, fragment
-                dummy_schema, chunk['host'], chunk['path'], dummy_query, dummy_fragment = zip(
-                    *chunk['url'].map(urlsplit))
-                chunk.drop(['url'], axis=1, inplace=True)
+                    # split request line
+                    chunk['method'], chunk['url'], chunk['protocol'] = zip(*chunk['request'].str.split(' ', n=2))
+                    chunk.drop(['request'], axis=1, inplace=True)
 
-                # session cookie
-                dummy = chunk['sessioncookie'].str.extract(
-                    r"session=(?:-|([^,]+)),(?:-|([^,]+)),(?:-|([^,]+)),(?:-|([^,;]+))", expand=True)
-                chunk['uid'] = dummy[0]
-                chunk['sid'] = dummy[1]
-                chunk.drop(['sessioncookie'], axis=1, inplace=True)
+                    # parse url, skip schema, fragment
+                    dummy_schema, chunk['host'], chunk['path'], dummy_query, dummy_fragment = zip(
+                        *chunk['url'].map(urlsplit))
+                    chunk.drop(['url'], axis=1, inplace=True)
 
-                # channel number (.fillna().sum() takes care of the OR case in the regexp)
-                chunk['livechannel'] = chunk['path'].str.extract(r'PLTV/88888888/\d+/(\d+)/|([^/]+)\.isml',
-                                                                 expand=False).fillna('').sum(axis=1)
+                    # session cookie
+                    dummy = chunk['sessioncookie'].str.extract(
+                        r"session=(?:-|([^,]+)),(?:-|([^,]+)),(?:-|([^,]+)),(?:-|([^,;]+))", expand=True)
+                    chunk['uid'] = dummy[0]
+                    chunk['sid'] = dummy[1]
+                    chunk.drop(['sessioncookie'], axis=1, inplace=True)
 
-                # contentpackage, assetid
-                dummy = chunk['path'].str.extract(r"/(\d{18,})/(\d{16,})/")
-                chunk['contentpackage'] = dummy[0]
-                chunk['assetnumber'] = dummy[1]
+                    # channel number (.fillna().sum() takes care of the OR case in the regexp)
+                    chunk['livechannel'] = chunk['path'].str.extract(r'PLTV/88888888/\d+/(\d+)/|([^/]+)\.isml',
+                                                                     expand=False).fillna('').sum(axis=1)
 
-                #########################
-                # enrich - geoip, use local cache for performance
-                geo = geolite2.reader()
+                    # contentpackage, assetid
+                    dummy = chunk['path'].str.extract(r"/(\d{18,})/(\d{16,})/")
+                    chunk['contentpackage'] = dummy[0]
+                    chunk['assetnumber'] = dummy[1]
 
-                @cached(cache=self._geocache)
-                def coord(ip: str) -> str:
-                    geodata = geo.get(ip)
+                    #########################
+                    # enrich - geoip, use local cache for performance
+                    geo = geolite2.reader()
 
-                    # round up to 2 digits (~1km precision, see https://wiki.openstreetmap.org/wiki/Precision_of_coordinates)
-                    return f"{round(geodata['location']['longitude'], 2)}:{round(geodata['location']['latitude'], 2)}" if geodata is not None and 'location' in geodata else np.nan
+                    @cached(cache=self._geocache)
+                    def coord(ip: str) -> str:
+                        geodata = geo.get(ip)
 
-                chunk['coordinates'] = chunk['ip'].map(coord, na_action='ignore')
-                chunk.drop(['ip'], axis=1, inplace=True)
+                        # round up to 2 digits (~1km precision, see https://wiki.openstreetmap.org/wiki/Precision_of_coordinates)
+                        return f"{round(geodata['location']['longitude'], 2)}:{round(geodata['location']['latitude'], 2)}" if geodata is not None and 'location' in geodata else np.nan
 
-                self._logger.debug(chunk.head(5))
+                    chunk['coordinates'] = chunk['ip'].map(coord, na_action='ignore')
+                    chunk.drop(['ip'], axis=1, inplace=True)
 
-                #########################
-                # enrich - user agent, use local cache for performance
+                    self._logger.debug(chunk.head(5))
 
-                @cached(cache=self._uacache)
-                def uaparser(ua_string: str) -> pd.Series:
-                    ps = user_agent_parser.Parse(ua_string)
-                    return pd.Series(
-                        [np.nan if x is None else x for x in
-                         [ps['device']['brand'], ps['device']['family'], ps['device']['model'], ps['os']['family'],
-                          ps['user_agent']['family'], ps['user_agent']['major']]]
-                    )
+                    #########################
+                    # enrich - user agent, use local cache for performance
 
-                chunk[["devicebrand", "devicefamily", "devicemodel", "osfamily", "uafamily", "uamajor"]] = chunk.loc[
-                    chunk['useragent'].notna(), 'useragent'].apply(uaparser)
-                chunk.drop(['useragent'], axis=1, inplace=True)
+                    @cached(cache=self._uacache)
+                    def uaparser(ua_string: str) -> pd.Series:
+                        ps = user_agent_parser.Parse(ua_string)
+                        return pd.Series(
+                            [np.nan if x is None else x for x in
+                             [ps['device']['brand'], ps['device']['family'], ps['device']['model'], ps['os']['family'],
+                              ps['user_agent']['family'], ps['user_agent']['major']]]
+                        )
 
-                self._logger.debug(chunk.head(5))
+                    chunk[["devicebrand", "devicefamily", "devicemodel", "osfamily", "uafamily", "uamajor"]] = \
+                        chunk.loc[
+                            chunk['useragent'].notna(), 'useragent'].apply(uaparser)
+                    chunk.drop(['useragent'], axis=1, inplace=True)
 
-                #########################
-                # enrich - streaming protocol
+                    self._logger.debug(chunk.head(5))
 
-                chunk['manifest'] = chunk['path'].str.match(r'(?:\.isml?/Manifest|\.mpd|\.m3u8)$', case=False)
-                chunk['fragment'] = chunk['path'].str.match(
-                    r'(?:\.m4[avi]|\.ts|\.ism[av]|\.mp[4a]|/(?:Fragments|KeyFrames)\(.*\))$', case=False)
+                    #########################
+                    # enrich - streaming protocol
 
-                #########################
-                # anonymize
+                    chunk['manifest'] = chunk['path'].str.match(r'(?:\.isml?/Manifest|\.mpd|\.m3u8)$', case=False)
+                    chunk['fragment'] = chunk['path'].str.match(
+                        r'(?:\.m4[avi]|\.ts|\.ism[av]|\.mp[4a]|/(?:Fragments|KeyFrames)\(.*\))$', case=False)
 
-                # substitute: map values to random hashes
-                for prefix in ['cachename', 'popname', 'host', 'coordinates', 'devicebrand',
-                               'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path',
-                               'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid']:
-                    assert prefix in self._mappers, f"Mapper prefix issue: '{prefix}' not found in '{self._mappers}'"
-                    chunk[prefix] = chunk[prefix].map(self._mappers[prefix].get, na_action='ignore')
+                    #########################
+                    # anonymize
 
-                self._logger.debug(chunk.head(5))
+                    # substitute: map values to random hashes
+                    for prefix in ['cachename', 'popname', 'host', 'coordinates', 'devicebrand',
+                                   'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path',
+                                   'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid']:
+                        assert prefix in self._mappers, f"Mapper prefix issue: '{prefix}' not found in '{self._mappers}'"
+                        chunk[prefix] = chunk[prefix].map(self._mappers[prefix].get, na_action='ignore')
 
-                # shift time
-                chunk['#timestamp'] += timedelta(days=self._timeshiftdays)
+                    self._logger.debug(chunk.head(5))
 
-                # convert byte to xyte
-                chunk.contentlength = chunk.contentlength.divide(self._xyte)
+                    # shift time
+                    chunk['#timestamp'] += timedelta(days=self._timeshiftdays)
 
-                #########################
-                # set index
-                chunk.set_index(['#timestamp', 'statuscode', 'method', 'protocol',
-                                 'hit', 'contenttype', 'cachename', 'popname', 'host', 'coordinates', 'devicebrand',
-                                 'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path', 'manifest',
-                                 'fragment', 'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid'],
-                                inplace=True)
+                    # convert byte to xyte
+                    chunk.contentlength = chunk.contentlength.divide(self._xyte)
 
-                assert set(chunk.columns) == set(
-                    list(['contentlength', 'timefirstbyte',
-                          'timetoserv'])), f"Somethink went wrong, column name mismatch: {chunk.columns}"
+                    #########################
+                    # set index
+                    chunk.set_index(['#timestamp', 'statuscode', 'method', 'protocol',
+                                     'hit', 'contenttype', 'cachename', 'popname', 'host', 'coordinates', 'devicebrand',
+                                     'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path',
+                                     'manifest',
+                                     'fragment', 'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid'],
+                                    inplace=True)
 
-                buff = StringIO()
-                chunk.to_csv(buff, header=True)
+                    assert set(chunk.columns) == set(
+                        list(['contentlength', 'timefirstbyte',
+                              'timetoserv'])), f"Somethink went wrong, column name mismatch: {chunk.columns}"
 
-                # send to writer
-                self._output.put(buff.getvalue().encode('utf-8'))
+                    # write
+                    buff = StringIO()
+                    chunk.to_csv(buff, header=True)
+                    logwriter.write(buff.getvalue().encode('utf-8'))
 
         except KeyboardInterrupt:
             self._logger.info("interrupt")
