@@ -111,6 +111,9 @@ class Worker(Process):
                     # split xforwarded for, keep the first IP
                     chunk.xforwardedfor = chunk.xforwardedfor.str.split(",", n=1, expand=True)[0]
 
+                    # remove cache name, if present in host (http redirect)
+                    chunk['host'] = chunk.host.str.replace(r"^[a-zA-Z0-9-]+--", '')
+
                     # check if all public
                     assert True  # TODO: implement
                     self._logger.debug(chunk.head(5))
