@@ -6,8 +6,10 @@ TODO: describe
 
 # Column Description
 
-[varnishncsa logformat](https://varnish-cache.org/docs/trunk/reference/varnishncsa.html)
-[uaparser](http://)
+## References:
+
+* [varnishncsa logformat](https://varnish-cache.org/docs/trunk/reference/varnishncsa.html)
+* [uaparser](http://)
 
 
 |Name|Description|Modified|Anonymization|Example|
