@@ -4,13 +4,18 @@
 
 TODO: describe
 
-# Column Description
+
+# Datafiles
 
 ## References:
 
 * [varnishncsa logformat](https://varnish-cache.org/docs/trunk/reference/varnishncsa.html)
 * [uaparser](http://)
 
+
+## Anonymized logfiles:
+
+`logname.bz2.ano-1.bz2.gpg`
 
 |Name|Description|Modified|Anonymization|Unit|Example|
 |--|--|--|--|--|--|
@@ -38,6 +43,29 @@ TODO: describe
 |assetnumber|VoD asset encoding version parsed from path|no|substitution|||
 |uid|id unique to a single user|no|substitution||`uid-951276f2635c065d28507d06`|
 |sid|id uniq to a streaming session (from a single VoD play till the end of that VoD)|no|substitution||`sid-d0753013b4d5b24dc6b3e8fb`|
-|contentlength|???|no|converted to xite |xite|`0.19897032101756512`|
+|contentlength|varnishncsa %b (be aware, this may not equal to the bytes actually sent)|no|converted to xite |xite|`0.19897032101756512`|
 |timefirstbyte|varnishncsa %{Varnish:time_firstbyte}x|no|no|seconds|`0.000193`|
 |timetoserv|varnishncsa %D|no|no|seconds|`0.000257`|
+
+
+## Distance data:
+
+`distances_150.csv`
+
+|hash/hash|coord-01|...     |coord-i |...|coord-n|
+|-------------|--------|--------|--------|---|-------|
+|**coord-01** |        |        |        |   |       |
+|**...**      |        |        |        |   |       |
+|**coord-j**  |        |        | NaN if distance(coord-i,coord-j) >150km<br/>distance(coord-i,coord-j) with 5km precision|   |       |
+|**...**      |        |        |        |   |       |
+|**coord-n**  |        |        |        |   |       |
+
+## Delivery services:
+
+`ds.csv`
+
+Description of the different delivery services (identified by the host header). `Garbage` signals an unauthorized or DDoS attack attempt (for Example: `%22%3E%3Cscript%3Ealert('Qualys_XSS_Joomla_2.5.3')%3C%2Fscript%3E,host-cd8518fbd7c5dfd3`)
+
+
+
+
