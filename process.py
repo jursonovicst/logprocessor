@@ -1,10 +1,9 @@
 import argparse
 import multiprocessing
 import configparser
-from multiprocessing import Manager
-from mapper import BaseMapper
 from anonymizer import Reader, Worker
 import logging
+from mapper import HashClass, MyManager
 
 parser = argparse.ArgumentParser()
 parser.add_argument('logfile', type=str)
@@ -39,22 +38,25 @@ if __name__ == "__main__":
         # arguments
         args = parser.parse_args()
 
+        # logging
+        logging.basicConfig(level=logging.INFO)
+
         # config
         config.read(args.configfile)
 
-        logging.basicConfig(level=logging.INFO)
+        MyManager.register('Hash', HashClass)
 
-        # what is this?
-        with Manager() as manager:
-            mappers = {prefix: BaseMapper(prefix=prefix, hashlen=hashlen, store=manager.dict()) for prefix, hashlen in
+        with MyManager() as manager:
+            proxies = {prefix: manager.Hash(prefix=prefix, hashlen=hashlen) for prefix, hashlen in
                        [('cachename', 4), ('popname', 4), ('host', 8), ('coordinates', 8),
                         ('devicebrand', 4), ('devicefamily', 4), ('devicemodel', 4), ('osfamily', 4), ('uafamily', 4),
                         ('uamajor', 4), ('path', 16), ('livechannel', 4), ('contentpackage', 8), ('assetnumber', 8),
-                        ('uid', 12), ('sid', 12)]}
+                        ('uid', 12), ('sid', 12)]
+                       }
 
             # load mapper secrets from disk
-            for prefix, mapper in mappers.items():
-                mapper.load(f"secrets/secrets_{prefix}.csv")
+            for prefix, proxy in proxies.items():
+                proxy.load(f"secrets/secrets_{prefix}.csv")
 
             # create reader and writer processes
             reader = Reader(args.logfile, args.chunksize, args.maxlines, args.queuelen)
@@ -64,7 +66,7 @@ if __name__ == "__main__":
             # create progress bar for file position
             # create progress bar for processed lines
             workers = [
-                Worker(i, f"{args.logfile}.ano-{i}.bz2", reader.queue, mappers, args.cachename,
+                Worker(i, f"{args.logfile}.ano-{i}.bz2", reader.queue, proxies, args.cachename,
                        args.popname, config['secrets'].getint('timeshiftdays'), config['secrets'].getfloat('xyte'),
                        args.cachesize,
                        encoding=args.encoding,
@@ -73,14 +75,18 @@ if __name__ == "__main__":
                        na_values=args.navalues,
                        escapechar=args.escapechar,
                        header=None,
-                       error_bad_lines=False,
+                       on_bad_lines='skip',
                        # X             X                            X                                                                              X   X     X                         X        X           X         X                                                                X                                                            X
                        # 0         1 2 3                     4      5                                                                              6   7 8   9              10         11       12  13      14  15 16 17                 18      19                                    20                                                 21 22     23
                        # 127.0.0.1 - - [22/Feb/2222:22:22:22 +0100] "GET http://xyz.cdn.de/this/is/the/path?and_this_is_the_query_string HTTP/1.1" 304 0 "-" "okhttp/4.9.0" xyz.cdn.de 0.000130 215 upstrea hit - 614 "application/json" 6596557 "session=-,INT-4178154,-,-; HttpOnly" "2222:22:2222:2222:2222:2222:2222:2222, 127.0.0.1" - TLSv1.2 c
-                       usecols=[0, 3, 5, 6, 7, 9, 11, 12, 14, 17, 19, 20, 23],
-                       names=['ip', '#timestamp', 'request', 'statuscode', 'contentlength', 'useragent',
+
+                       # 0         1 2 3                     4      5                                         6   7   8   9              10          11       12  13       14  15 16  17                18        19                                      20                                 21                                      22                         23 24     25
+                       # 127.0.0.1 - - [30/Jun/2021:07:05:20 +0200] "GET http://xyz.cdn.de/blablabl HTTP/1.1" 200 950 "-" "okhttp/4.9.0" xyz.cdn.com 0.000125 180 upstream hit - 1627 "application/zip" 978608424 "session=-,INT-969498284,-,-; HttpOnly" "Cache-Control:public,max-age=300" "ETag:18ad26753cb3db1be3cf097badf6df5d" "89.204.153.53, 127.0.0.1" - TLSv1.2 c
+                       usecols=[0, 3, 5, 6, 7, 9, 10, 11, 12, 14, 17, 19, 20, 22, 25],
+                       names=['ip', '#timestamp', 'request', 'statuscode', 'contentlength', 'useragent', 'host',
                               'timefirstbyte',
-                              'timetoserv', 'hit', 'contenttype', 'sessioncookie', 'xforwardedfor', 'side'],
+                              'timetoserv', 'hit', 'contenttype', 'sessioncookie', 'cachecontrol', 'xforwardedfor',
+                              'side'],
                        parse_dates=['#timestamp'],
                        #           [22/Feb/2222:22:22:22s
                        dateformat='[%d/%b/%Y:%H:%M:%S'
@@ -103,10 +109,12 @@ if __name__ == "__main__":
                 worker.join()
 
             # save mapper secrets
-            for prefix, mapper in mappers.items():
-                mapper.save(f"secrets/secrets_{prefix}.csv")
+            for prefix, proxy in proxies.items():
+                proxy.save(f"secrets/secrets_{prefix}.csv")
 
         print(f"logfile {args.logfile} anonymization complete")
 
     except KeyboardInterrupt:
         pass
+    except Exception:
+        logging.exception("Error in processing")

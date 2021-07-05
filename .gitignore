@@ -1,5 +1,5 @@
-raw
+logs
 venv
-secrets
+secrets/*.csv
 __pycache__
 config.ini

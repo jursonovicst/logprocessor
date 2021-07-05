@@ -84,12 +84,13 @@ class Worker(Process):
                             or '#timestamp' not in chunk.columns \
                             or 'contenttype' not in chunk.columns \
                             or 'ip' not in chunk.columns \
+                            or 'host' not in chunk.columns \
                             or 'request' not in chunk.columns \
                             or 'side' not in chunk.columns \
                             or 'statuscode' not in chunk.columns \
                             or 'timetoserv' not in chunk.columns \
                             or 'sessioncookie' not in chunk.columns \
-                            :
+                            or 'cachecontrol' not in chunk.columns:
                         raise SyntaxError(f"Required column(s) not found: {chunk.columns}")
 
                     self._logger.debug(chunk.head(5))
@@ -112,7 +113,7 @@ class Worker(Process):
                     chunk.xforwardedfor = chunk.xforwardedfor.str.split(",", n=1, expand=True)[0]
 
                     # remove cache name, if present in host (http redirect)
-                    chunk['host'] = chunk.host.str.replace(r"^[a-zA-Z0-9-]+--", '')
+                    chunk['host'].replace(r"^[a-zA-Z0-9-]+--", '', inplace=True)
 
                     # check if all public
                     assert True  # TODO: implement
@@ -135,7 +136,7 @@ class Worker(Process):
                     chunk.drop(['request'], axis=1, inplace=True)
 
                     # parse url, skip schema, fragment
-                    dummy_schema, chunk['host'], chunk['path'], dummy_query, dummy_fragment = zip(
+                    dummy_schema, dummy_host, chunk['path'], dummy_query, dummy_fragment = zip(
                         *chunk['url'].map(urlsplit))
                     chunk.drop(['url'], axis=1, inplace=True)
 
@@ -148,7 +149,8 @@ class Worker(Process):
 
                     # channel number (.fillna().sum() takes care of the OR case in the regexp)
                     chunk['livechannel'] = chunk['path'].str.extract(r'PLTV/88888888/\d+/(\d+)/|([^/]+)\.isml',
-                                                                     expand=False).fillna('').sum(axis=1)
+                                                                     expand=False).fillna('').sum(axis=1).replace('',
+                                                                                                                  np.NaN)
 
                     # contentpackage, assetid
                     dummy = chunk['path'].str.extract(r"/(\d{18,})/(\d{16,})/")
@@ -221,7 +223,8 @@ class Worker(Process):
                                      'hit', 'contenttype', 'cachename', 'popname', 'host', 'coordinates', 'devicebrand',
                                      'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path',
                                      'manifest',
-                                     'fragment', 'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid'],
+                                     'fragment', 'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid',
+                                     'cachecontrol'],
                                     inplace=True)
 
                     assert set(chunk.columns) == set(

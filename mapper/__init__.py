@@ -1,2 +1,1 @@
-from .basemapper import BaseMapper
-from .hashdict import HashDict
+from .hashclass import HashClass, MyManager
