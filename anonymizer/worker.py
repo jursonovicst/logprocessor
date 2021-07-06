@@ -19,7 +19,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = '100'
 
 class Worker(Process):
     def __init__(self, no: int, logfilename: str, input: Queue, mappers: dict, cachename: str,
-                 popname: str, timeshiftdays: int, xyte: float, cachesize: int, **read_csv_args):
+                 popname: str, timeshiftdays: int, xyte: float, **read_csv_args):
         super().__init__(name=f"Worker-{no}")
         self._no = no
         self._logfilename = logfilename
@@ -36,8 +36,6 @@ class Worker(Process):
         self._popname = popname
 
         # local caches for acceleration
-        assert cachesize >= 0, f"Wrong cachesize: {cachesize}"
-        self._cachesize = cachesize
         self._geocache = {}
         self._uacache = {}
 
@@ -54,8 +52,8 @@ class Worker(Process):
             dateformat = self._read_csv_args.pop('dateformat')
             self._read_csv_args['date_parser'] = lambda x: datetime.strptime(x, dateformat)
 
-            with bz2.BZ2File(self._logfilename, mode='w') as logwriter, \
-                    tqdm(position=3 + self._no, unit='line', desc=self.name, unit_scale=True) as pbar_lines:
+            with bz2.BZ2File(self._logfilename, mode='w') as logwriter:#, \
+                    #tqdm(position=3 + self._no, unit='line', desc=self.name, unit_scale=True) as pbar_lines:
 
                 while True:
 
@@ -236,9 +234,9 @@ class Worker(Process):
                     chunk.to_csv(buff, header=True)
                     logwriter.write(buff.getvalue().encode('utf-8'))
 
-                    pbar_lines.update(chunk.shape[0])
+                    #pbar_lines.update(chunk.shape[0])
 
-                pbar_lines.display(f"***DONE***")
+                #pbar_lines.display(f"***DONE***")
 
         except KeyboardInterrupt:
             self._logger.info("interrupt")

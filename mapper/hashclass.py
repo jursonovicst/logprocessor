@@ -1,6 +1,4 @@
 import logging
-import operator
-from cachetools import LRUCache, cachedmethod
 import os
 import pandas as pd
 import numpy as np
@@ -14,7 +12,7 @@ class MyManager(BaseManager):
 
 
 class HashClass:
-    def __init__(self, hashlen: int, prefix: str = '', filename: str = None, maxcachesize: int = 10000):
+    def __init__(self, hashlen: int, prefix: str = '', filename: str = None):
         """
         :param hashlen: length of hash generated
         :param prefix: prefix returned values
@@ -25,29 +23,20 @@ class HashClass:
         self._prefix = prefix.lower()
         self._store = {}
         self._lock = Lock()
-        self.cache = LRUCache(maxsize=maxcachesize)
 
         if filename is not None:
             self.load(filename)
 
-    @cachedmethod(operator.attrgetter('cache'))
     def get(self, key):
         # do not map NaN/None values
         if key is None or key == np.nan:
-            return key
+            return np.nan
 
-        if self._prefix is None:
-            self._lock.acquire(block=True, timeout=10)
-            if key not in self._store:
-                self._store[key] = os.urandom(self._hashlen).hex()
-            self._lock.release()
-        else:
-            self._lock.acquire(block=True, timeout=10)
-            if key not in self._store:
-                self._store[key] = self._prefix + "-" + os.urandom(self._hashlen).hex()
-            self._lock.release()
+        self._lock.acquire(block=True, timeout=10)
+        ret = self._store.setdefault(key, os.urandom(self._hashlen).hex())
+        self._lock.release()
 
-        return f"{self._store[key]}"
+        return ret
 
     def save(self, filename: str):
         print(self._store)
