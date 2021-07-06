@@ -8,9 +8,9 @@ import platform
 
 
 class Reader(Process):
-    def __init__(self, logfilename: str, batchsize: int, maxlines: int, queuelen: int):
-        super().__init__(name="Reader")
-        self._logfilename = logfilename
+    def __init__(self, filename: str, batchsize: int, maxlines: int, queuelen: int):
+        super().__init__(name=f"Reader-{filename}")
+        self._filename = filename
         self._batchsize = batchsize
         self._maxlines = maxlines
 
@@ -22,11 +22,11 @@ class Reader(Process):
             # open logfile for reading
             # attach decompressor
             # create progress bars
-            with open(self._logfilename, 'rb') as logfile, \
+            with open(self._filename, 'rb') as logfile, \
                     bz2.BZ2File(logfile) as logreader, \
-                    tqdm(total=os.path.getsize(self._logfilename), position=0, desc=self._logfilename, unit='B',
+                    tqdm(total=os.path.getsize(self._filename), position=0, desc=self._filename, unit='B',
                          unit_scale=True) as pbar_filepos, \
-                    tqdm(position=1, unit='line', desc=self._logfilename, unit_scale=True) as pbar_lines, \
+                    tqdm(position=1, unit='line', desc=self._filename, unit_scale=True) as pbar_lines, \
                     tqdm(position=2) as pbar_queue:
 
                 # for progress bar
