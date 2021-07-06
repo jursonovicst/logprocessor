@@ -3,7 +3,7 @@ import multiprocessing
 import configparser
 from anonymizer import Reader, Worker
 import logging
-from mapper import HashClass, MyManager
+from mapper import MapperClass, MyManager
 
 parser = argparse.ArgumentParser()
 parser.add_argument('logfile', type=str)
@@ -61,7 +61,7 @@ if __name__ == "__main__":
                   ('sid', 12)]
 
         # register HashClass
-        MyManager.register('Hash', HashClass)
+        MyManager.register('Hash', MapperClass)
 
         # create managers
         managers = [MyManager() for prefix, hashlen in params]
@@ -70,7 +70,8 @@ if __name__ == "__main__":
         list(map(lambda manager: manager.start(), managers))
 
         # create proxies
-        proxies = {param[0]: manager.Hash(prefix=param[0], hashlen=param[1], filename=f"secrets/secrets_{param[0]}.csv") for param, manager in zip(params, managers)}
+        proxies = {param[0]: manager.Hash(hashlen=param[1], filename=f"secrets/secrets_{param[0]}.csv") for
+                   param, manager in zip(params, managers)}
 
         # create reader and writer processes
         reader = Reader(args.logfile, args.chunksize, args.maxlines, args.queuelen)
@@ -134,4 +135,5 @@ if __name__ == "__main__":
     finally:
         # stop managers
         list(map(lambda manager: manager.shutdown(), managers))
+        list(map(lambda manager: manager.join(timeout=1), managers))
 

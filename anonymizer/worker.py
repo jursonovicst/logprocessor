@@ -12,7 +12,6 @@ from urllib.parse import urlsplit
 from datetime import datetime
 import bz2
 import os
-from tqdm.auto import tqdm
 
 os.environ['NUMEXPR_MAX_THREADS'] = '100'
 
@@ -52,8 +51,7 @@ class Worker(Process):
             dateformat = self._read_csv_args.pop('dateformat')
             self._read_csv_args['date_parser'] = lambda x: datetime.strptime(x, dateformat)
 
-            with bz2.BZ2File(self._logfilename, mode='w') as logwriter:#, \
-                    #tqdm(position=3 + self._no, unit='line', desc=self.name, unit_scale=True) as pbar_lines:
+            with bz2.BZ2File(self._logfilename, mode='w') as logwriter:
 
                 while True:
 
@@ -205,7 +203,7 @@ class Worker(Process):
                                    'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path',
                                    'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid']:
                         assert prefix in self._mappers, f"Mapper prefix issue: '{prefix}' not found in '{self._mappers}'"
-                        chunk[prefix] = chunk[prefix].map(self._mappers[prefix].get, na_action='ignore')
+                        chunk[prefix] = chunk[prefix].map(self._mappers[prefix].map, na_action='ignore')
 
                     self._logger.debug(chunk.head(5))
 
@@ -233,10 +231,6 @@ class Worker(Process):
                     buff = StringIO()
                     chunk.to_csv(buff, header=True)
                     logwriter.write(buff.getvalue().encode('utf-8'))
-
-                    #pbar_lines.update(chunk.shape[0])
-
-                #pbar_lines.display(f"***DONE***")
 
         except KeyboardInterrupt:
             self._logger.info("interrupt")

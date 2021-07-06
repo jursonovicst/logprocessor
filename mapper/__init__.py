@@ -1,1 +1,2 @@
-from .hashclass import HashClass, MyManager
+from .mapperclass import MapperClass
+from .mymanager import MyManager
