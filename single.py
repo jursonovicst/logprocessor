@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
         with open(args.logfile, 'rb') as logfile, \
                 bz2.BZ2File(logfile) as logreader, \
-                bz2.BZ2File(f"{args.logfile}.ano.bz2", mode='w') as logwriter, \
+                bz2.BZ2File(f"{args.logfile}.ano.bz2", mode='w', compresslevel=1) as logwriter, \
                 tqdm(total=os.path.getsize(args.logfile), position=0, desc=args.logfile, unit='B',
                      unit_scale=True) as pbar_filepos, \
                 tqdm(position=1, unit='line', desc=args.logfile, unit_scale=True) as pbar_lines:
