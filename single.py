@@ -74,6 +74,7 @@ if __name__ == "__main__":
                             12, 12]
 
                 mydicts = {prefix: MyDict(hashlen) for prefix, hashlen in zip(prefixes, hashlens)}
+                list(map(lambda mydict, prefix: mydict.load(f"secrets/{prefix}.csv"), mydicts.values(), prefixes))
 
 
                 for chunk in pd.read_csv(logreader,
@@ -285,6 +286,8 @@ if __name__ == "__main__":
                         if maxitems == 0:
                             # reached maxitems
                             break
+
+                list(map(lambda mydict, prefix: mydict.save(f"secrets/{prefix}.csv"), mydicts.values(), prefixes))
 
 
     except Exception:
