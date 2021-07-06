@@ -1,3 +1,4 @@
+#!/usr/bun/env python3
 import argparse
 from multiprocessing import cpu_count
 import configparser

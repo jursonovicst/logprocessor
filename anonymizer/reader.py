@@ -1,4 +1,5 @@
 from multiprocessing import Process, Queue
+from queue import Full
 from tqdm.auto import tqdm
 import bz2
 import os
@@ -46,7 +47,13 @@ class Reader(Process):
                         pbar_queue.display(f"read queue: {self._queue.qsize()}")
 
                     # send them for the workers, this may block for backpressure
-                    self._queue.put(batch)
+                    while True:
+                        try:
+                            self._queue.put(batch, block=True, timeout=0.1)
+                        except Full:
+                            continue
+                        else:
+                            break
 
                     # check limit (-1 means, no limit)
                     if maxitems != -1:
