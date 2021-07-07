@@ -9,7 +9,7 @@ class MyDict(object):
         self._counter = 0
 
     def map(self, key):
-        if key is None or key ==np.nan:
+        if key is None:
             return np.nan
 
         if key in self._dict:

@@ -201,7 +201,6 @@ if __name__ == "__main__":
                 # contentpackage, assetid
                 dummy = chunk['path'].str.extract(r"/(\d{18,})/(\d{16,})/")
                 chunk['contentpackage'] = dummy[0]
-                chunk['contentpackage'] = dummy[0]
                 chunk['assetnumber'] = dummy[1]
 
                 # cache control
@@ -239,7 +238,7 @@ if __name__ == "__main__":
                                'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path',
                                'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid']:
                     assert prefix in mydicts, f"Mapper prefix issue: '{prefix}' not found in '{mydicts}'"
-                    chunk[prefix] = chunk[prefix].map(mydicts[prefix].map, na_action='ignore')
+                    chunk[prefix] = chunk[prefix].map(mydicts[prefix].map, na_action='ignore').astype(object)
 
                 logging.debug(chunk.head(5))
 
@@ -262,6 +261,7 @@ if __name__ == "__main__":
                 # assert set(chunk.columns) == set(
                 #     list(['contentlength', 'timefirstbyte',
                 #           'timetoserv'])), f"Somethink went wrong, column name mismatch: {chunk.columns}"
+                print(chunk.dtypes)
 
                 # write
                 buff = StringIO()
