@@ -261,7 +261,6 @@ if __name__ == "__main__":
                 # assert set(chunk.columns) == set(
                 #     list(['contentlength', 'timefirstbyte',
                 #           'timetoserv'])), f"Somethink went wrong, column name mismatch: {chunk.columns}"
-                print(chunk.dtypes)
 
                 # write
                 buff = StringIO()
