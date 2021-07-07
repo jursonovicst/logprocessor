@@ -238,7 +238,7 @@ if __name__ == "__main__":
                                'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path',
                                'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid']:
                     assert prefix in mydicts, f"Mapper prefix issue: '{prefix}' not found in '{mydicts}'"
-                    chunk[prefix] = chunk[prefix].map(mydicts[prefix].map, na_action='ignore').astype(object)
+                    chunk[prefix] = chunk[prefix].map(mydicts[prefix].map, na_action='ignore')
 
                 logging.debug(chunk.head(5))
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
 
                 # write
                 buff = StringIO()
-                chunk.to_csv(buff, header=True, index=False)
+                chunk.to_csv(buff, header=True, index=False, na_rep='-')
                 logwriter.write(buff.getvalue().encode('utf-8'))
 
                 # update progress bar

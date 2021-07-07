@@ -15,7 +15,7 @@ class MyDict(object):
         if key in self._dict:
             return self._dict[key]
         else:
-            self._dict[key] = self._counter
+            self._dict[key] = str(self._counter)
             self._counter += 1
             return self._counter - 1
 
