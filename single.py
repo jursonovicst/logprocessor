@@ -264,7 +264,7 @@ if __name__ == "__main__":
 
                 # write
                 buff = StringIO()
-                chunk.to_csv(buff, header=True, index=False, na_rep='-')
+                chunk.to_csv(buff, header=True, index=False)
                 logwriter.write(buff.getvalue().encode('utf-8'))
 
                 # update progress bar
