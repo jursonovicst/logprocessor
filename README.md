@@ -40,11 +40,11 @@ uid,sid,livechannel,contentpackage,assetnumber,maxage,coordinates,devicebrand,de
 
 |Name          |Type    |Unit  |Description|Anonymization|RAW example|Anonymized example|
 |--------------|--------|------|-----------|-------------|-----------|------------------|
-|uid           |str     |      |see session tracking|substitution|<telekom intern id>|45|
-|sid           |str     |      |see session tracking|substitution|<telekom intern id>|42|
+|uid           |str     |      |see session tracking|substitution|*intern. id*|45|
+|sid           |str     |      |see session tracking|substitution|*intern. id*|42|
 |livechannel   |str     |      |Live TV channel name|substitution|cnn|63|
 |contentpackage|str     |      |Movie identifier|substitution|Return of the Jedi|22|
-|assetnumber   |str     |      |Encoding variant of the content packages. It might be updated by every reencoding.|substitution|<telekom intern id>|65|
+|assetnumber   |str     |      |Encoding variant of the content packages. It might be updated by every reencoding.|substitution|*intern. id*|65|
 |maxage        |int     |second|parsed from %{Cache-Control}o|-|300|300|
 |coordinates   |str     |      |long. and lat. of the client based on geoip lookup|substitution|8.454:46.444|6|
 |devicebrand   |str     |      |uaparser on %{User-agent}i|substitution|Apple|3|
