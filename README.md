@@ -8,10 +8,10 @@ TODO: describe
 
 ## References:
 
-* [varnishncsa logformat](https://varnish-cache.org/docs/trunk/reference/varnishncsa.html)
+* [varnishncsa logformat](https://varnish-cache.org/docs/6.0/reference/varnishncsa.html)
 * [uaparser](http://)
 
-## Abbreviations
+## Fields
 
 |Name|Abbrev|
 |---|---|
