@@ -12,10 +12,51 @@ TODO: describe
 * [uaparser](http://)
 
 ## Fields
+uid,sid,livechannel,contentpackage,assetnumber,maxage,coordinates,devicebrand,devicefamily,devicemodel,osfamily,uafamily,uamajor,manifest,fragment
+-,0,-,-,-,300,0,-,0,-,0,0,0,False,False
 
-|Name|Abbrev|
-|---|---|
-|cn|cachename|
+* NaN values are marked with `-`.
+* Details of format codes in descriotion, see References
+
+|Name          |Type    |Unit  |Description|Anonymization|RAW example|Anonymized example|
+|--------------|--------|------|-----------|-------------|-----------|------------------|
+|timestamp     |datetime|      |%t         |shift with constatn number of weeks|2021-01-01 06:59:46|2088-01-08 06:59:46|
+|statuscode    |int     |      |%s         |-            |200|200|
+|contentlength |float   |xyte  |%b         |multiplication with a constant value|300kB|0.14285714285714285|
+|host          |int     |      |%{Host}i   |subtitution. |livetv.cdn.telekom.de|3|
+|timefirstbyte |float   |second|%{Varnish:time_firstbyte}x|-|0.01|0.01| 
+|timetoserv    |float   |second|%D         |-            |0.123|0.123|
+|hit           |str     |      |%{Varnish:hitmiss}|-|hit|hit|
+|contenttype   |str     |      |%{Content-Type}o|-|application/json|application/json|
+|cachecontrol  |str     |      |%{Cache-Control}o|-|Cache-Control:public,max-age=300|Cache-Control:public,max-age=300|
+|cachename     |int     |      |cache's hostname|substitution|edge_cache_frankfurt|5|
+|popname       |int     |      |cache's location|substitution|Frankfurt|3|
+|method        |str     |      |%m         |-|GET|GET|
+|protocol      |str     |      |%H         |-|HTTP/1.1|HTTP/1.1|
+|path          |str     |      |%U%q       |substitution|/resource/index.html|656|
+
+
+## Generated fields
+
+|Name          |Type    |Unit  |Description|Anonymization|RAW example|Anonymized example|
+|--------------|--------|------|-----------|-------------|-----------|------------------|
+|uid           |str     |      |||||
+|sid           |str     |      |||||
+|livechannel   |str     |      |||||
+|contentpackage|str     |      |||||
+|assetnumber   |str     |      |||||
+|maxage        |int     |second|||||
+|coordinates   |str     |      |||||
+|devicebrand   |str     |      |||||
+|devicefamily  |str     |      |||||
+|devicemodel   |str     |      |||||
+|osfamily      |str     |      |||||
+|uafamily      |str     |      |||||
+|uamajor       |str     |      |||||
+|manifest      |bool    |      |||||
+|fragment      |bool    |      |||||
+
+
 |pn|popname|
 |h|host|
 |c|coordinates|
