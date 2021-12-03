@@ -23,7 +23,7 @@ uid,sid,livechannel,contentpackage,assetnumber,maxage,coordinates,devicebrand,de
 |timestamp     |datetime|      |%t         |shift with constatn number of weeks|2021-01-01 06:59:46|2088-01-08 06:59:46|
 |statuscode    |int     |      |%s         |-            |200|200|
 |contentlength |float   |xyte  |%b         |multiplication with a constant value|300kB|0.14285714285714285|
-|host          |int     |      |%{Host}i   |subtitution. |livetv.cdn.telekom.de|3|
+|host          |int     |      |%{Host}i   |subtitution. |livetv.cdn.isp.com|3|
 |timefirstbyte |float   |second|%{Varnish:time_firstbyte}x|-|0.01|0.01| 
 |timetoserv    |float   |second|%D         |-            |0.123|0.123|
 |hit           |str     |      |%{Varnish:hitmiss}|-|hit|hit|
