@@ -15,8 +15,8 @@ TODO: describe
 uid,sid,livechannel,contentpackage,assetnumber,maxage,coordinates,devicebrand,devicefamily,devicemodel,osfamily,uafamily,uamajor,manifest,fragment
 -,0,-,-,-,300,0,-,0,-,0,0,0,False,False
 
-* NaN values are marked with `-`.
-* Details of format codes in descriotion, see References
+* NaN values are marked with `-`
+* See References for the details of format codes in descriotion
 
 |Name          |Type    |Unit  |Description|Anonymization|RAW example|Anonymized example|
 |--------------|--------|------|-----------|-------------|-----------|------------------|
@@ -40,65 +40,45 @@ uid,sid,livechannel,contentpackage,assetnumber,maxage,coordinates,devicebrand,de
 
 |Name          |Type    |Unit  |Description|Anonymization|RAW example|Anonymized example|
 |--------------|--------|------|-----------|-------------|-----------|------------------|
-|uid           |str     |      |||||
-|sid           |str     |      |||||
-|livechannel   |str     |      |||||
-|contentpackage|str     |      |||||
-|assetnumber   |str     |      |||||
-|maxage        |int     |second|||||
-|coordinates   |str     |      |||||
-|devicebrand   |str     |      |||||
-|devicefamily  |str     |      |||||
-|devicemodel   |str     |      |||||
-|osfamily      |str     |      |||||
-|uafamily      |str     |      |||||
-|uamajor       |str     |      |||||
-|manifest      |bool    |      |||||
-|fragment      |bool    |      |||||
+|uid           |str     |      |see session tracking|substitution|<telekom intern id>|45|
+|sid           |str     |      |see session tracking|substitution|<telekom intern id>|42|
+|livechannel   |str     |      |Live TV channel name|substitution|cnn|63|
+|contentpackage|str     |      |Movie identifier|substitution|Return of the Jedi|22|
+|assetnumber   |str     |      |Encoding variant of the content packages. It might be updated by every reencoding.|substitution|<telekom intern id>|65|
+|maxage        |int     |second|parsed from %{Cache-Control}o|-|300|300|
+|coordinates   |str     |      |long. and lat. of the client based on geoip lookup|substitution|8.454:46.444|6|
+|devicebrand   |str     |      |uaparser on %{User-agent}i|substitution|Apple|3|
+|devicefamily  |str     |      |uaparser on %{User-agent}i|substitution|Mac|32|
+|devicemodel   |str     |      |uaparser on %{User-agent}i|substitution|Mac|5|
+|osfamily      |str     |      |uaparser on %{User-agent}i|substitution|Mac OS X|7|
+|uafamily      |str     |      |uaparser on %{User-agent}i|substitution|Chrome|9|
+|uamajor       |str     |      |uaparser on %{User-agent}i|substitution|10|20|
+|manifest      |bool    |      |regexp match on path|-|true|true|
+|fragment      |bool    |      |regexp match on path|-|false|false|
 
-
-|pn|popname|
-|h|host|
-|c|coordinates|
-|db|devicebrand|
-|df|devicefamily|
-|dm|devicemodel|
-|of|osfamily|
-|uf|uafamily|
-|um|uamajor|
-|p|path|
-|lc|livechannel|
-|cp|contentpackage|
-|an|assetnumber|
-|uid|uid|
-|sid|sid|
-
+## Session tracking
+  
+TODO: describe
+  
 ## Anonymized logfiles:
 
 `logname.bz2.ano-1.bz2.gpg`
 
-|Name|Description|Modified|Anonymization|Unit|Example| |--|--|--|--|--|--| |timestamp|varnishncsa %t|no|shifted with
-whole days||`2081-08-10 07:27:45`| |statuscode|varnishncsa %s|no|no||`200`| |method|varnishncsa %r|???|no||`GET`|
-|protocol|varnishncsa %r|???|no||`HTTP/1.1`| |hit|%{Varnish:hitmiss}x|no|no||`hit`| |contenttype|"%{Content-Type}o"
-|no|no||`text/xml`| |cachename|hostname of the cache node|no|substitution||`cachename-9f7407ab`| |popname|name of the
-pop, in which the cache sits|no|substitution||`popname-ea30c95d`| |host|varnishncsa
-%{Host}i|no|substitution||`host-3e4e7625b87a06b4`| |coordinates|lat:long coordinates based on a geoip lookup of client's
-IP|long/lat rounded up to two decimal places (~1km precision in EU)|substituted||`coordinates-cade362a712f9a5e`|
-|devicebrand|%{User-agent}i|uaparser|substitution||`devicebrand-a514a965`|
-|devicefamily|%{User-agent}i|uaparser|substitution||`devicefamily-59342d25`|
-|devicemodel|%{User-agent}i|uaparser|substitution||`devicemodel-90ce0a37`|
-|osfamily|%{User-agent}i|uaparser|substitution||`osfamily-f5984c0b`|
-|uafamily|%{User-agent}i|uaparser|substitution||`uafamily-4cd61238`| |uamajor|||||| |path|varnishncsa
-%r|???|substituted||`path-518c4a144f6e7cfed8a3b6178349b36e`| |manifest|regexp match on path|no|no||`False`|
-|fragment|regexp match on path|no|no||`False`| |livechannel|live TV channel number parsed from
-path|no|substitution||`livechannel-7441b3f7`| |contentpackage|VoD asset identifier parsed from path|no|substitution|||
-|assetnumber|VoD asset encoding version parsed from path|no|substitution||| |uid|id unique to a single
-user|no|substitution||`uid-951276f2635c065d28507d06`| |sid|id uniq to a streaming session (from a single VoD play till
-the end of that VoD)|no|substitution||`sid-d0753013b4d5b24dc6b3e8fb`| |contentlength|varnishncsa %b (be aware, this may
-not equal to the bytes actually sent)|no|converted to xite |xite|`0.19897032101756512`| |timefirstbyte|varnishncsa
-%{Varnish:time_firstbyte}x|no|no|seconds|`0.000193`| |timetoserv|varnishncsa %D|no|no|seconds|`0.000257`|
+``` csv
+#timestamp,statuscode,contentlength,host,timefirstbyte,timetoserv,hit,contenttype,cachecontrol,cachename,popname,method,protocol,path,uid,sid,livechannel,contentpackage,assetnumber,maxage,coordinates,devicebrand,devicefamily,devicemodel,osfamily,uafamily,uamajor,manifest,fragment
+2088-05-13 06:59:46,200,0.14285714285714285,0,0.000111,0.000161,hit,application/json,"Cache-Control:public,max-age=300",0,0,GET,HTTP/1.1,0,-,0,-,-,-,300,0,-,0,-,0,0,0,False,False
+2088-05-13 06:59:46,200,15.079365079365079,0,8.2e-05,0.000119,hit,application/zip,"Cache-Control:public,max-age=300",0,0,GET,HTTP/1.1,1,-,0,-,-,-,300,1,-,0,-,0,0,0,False,False
+2088-05-13 06:59:46,200,15.079365079365079,0,0.000143,0.000203,hit,application/zip,"Cache-Control:public,max-age=300",0,0,GET,HTTP/1.1,1,-,1,-,-,-,300,1,-,0,-,0,0,0,False,False
+2088-05-13 06:59:46,200,25276.555555555555,1,0.000146,0.154427,hit,video/mp4,Cache-Control:max-age=14400,0,0,GET,HTTP/1.1,2,0,2,0,-,-,14400,1,0,1,0,1,1,-,False,False
+2088-05-13 06:59:46,200,25276.555555555555,1,0.012388,0.25097,miss,video/mp4,Cache-Control:max-age=14400,0,0,GET,HTTP/1.1,2,-,3,0,-,-,14400,1,0,1,0,1,1,-,False,False
+2088-05-13 06:59:46,200,15945.666666666666,1,0.000132,0.000662,hit,video/mp4,Cache-Control:max-age=14400,0,0,GET,HTTP/1.1,3,1,4,1,-,-,14400,1,0,1,0,1,2,1,False,False
+2088-05-13 06:59:46,200,531.1587301587301,1,0.000125,0.0002,hit,video/mp4,Cache-Control:max-age=14400,0,0,GET,HTTP/1.1,4,1,4,1,-,-,14400,1,0,1,0,1,2,1,False,False
+2088-05-13 06:59:46,200,15.079365079365079,0,0.000125,0.000179,hit,application/zip,"Cache-Control:public,max-age=300",0,0,GET,HTTP/1.1,1,-,5,-,-,-,300,2,-,0,-,0,0,0,False,False
+2088-05-13 06:59:46,200,535.0952380952381,1,0.000128,0.000204,hit,video/mp4,Cache-Control:max-age=14400,0,0,GET,HTTP/1.1,5,2,6,2,-,-,14400,1,0,1,0,1,1,-,False,False
+```
 
 ## Distance data:
+
 
 `distances_150.csv`
 
