@@ -49,14 +49,14 @@ class Worker(Process):
 
     def run(self):
 
-        try:
-            dateformat = self._read_csv_args.pop('dateformat')
-            self._read_csv_args['date_parser'] = lambda x: datetime.strptime(x, dateformat)
+        dateformat = self._read_csv_args.pop('dateformat')
+        self._read_csv_args['date_parser'] = lambda x: datetime.strptime(x, dateformat)
 
-            with bz2.BZ2File(self._logfilename, mode='w') as logwriter:
+        with bz2.BZ2File(self._logfilename, mode='w') as logwriter:
 
-                while True:
+            while True:
 
+                try:
                     # wait for a task
                     try:
                         batch = self._input.get(block=True, timeout=0.25)
@@ -254,11 +254,13 @@ class Worker(Process):
                     chunk.to_csv(buff, header=True)
                     logwriter.write(buff.getvalue().encode('utf-8'))
 
-        except KeyboardInterrupt:
-            self._logger.info("interrupt")
+                except KeyboardInterrupt:
+                    self._logger.info("interrupt")
+                    break
 
-        except Exception:
-            self._logger.exception("Error")
+                except Exception:
+                    self._logger.exception("Skipping batch due to exception.")
+
 
     def eof(self):
         self._eof.set()
