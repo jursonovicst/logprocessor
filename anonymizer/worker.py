@@ -78,27 +78,30 @@ class Worker(Process):
                     #########################
                     # check TODO: add missing
                     if 'ip' not in chunk.columns \
-                            or 'xforwardedfor' not in chunk.columns \
                             or '#timestamp' not in chunk.columns \
                             or 'contenttype' not in chunk.columns \
                             or 'ip' not in chunk.columns \
-                            or 'host' not in chunk.columns \
                             or 'request' not in chunk.columns \
-                            or 'side' not in chunk.columns \
                             or 'statuscode' not in chunk.columns \
-                            or 'timetoserv' not in chunk.columns \
-                            or 'sessioncookie' not in chunk.columns \
-                            or 'cachecontrol' not in chunk.columns:
+                            or 'timetoserv' not in chunk.columns:
                         raise SyntaxError(f"Required column(s) not found: {chunk.columns}")
+
+                    if 'side' not in chunk.columns \
+                            or 'sessioncookie' not in chunk.columns \
+                            or 'xforwardedfor' not in chunk.columns \
+                            or 'cachecontrol' not in chunk.columns:
+                        self._logger.warn(f"Optional column(s) not found: {chunk.columns}")
+
 
                     self._logger.debug(chunk.head(5))
 
                     #########################
                     # filter
 
-                    # drop non downstream lines
-                    chunk.drop(chunk.loc[chunk['side'] != 'c'].index, inplace=True)
-                    chunk.drop(['side'], axis=1, inplace=True)
+                    if 'side' in chunk.columns:
+                        # drop non downstream lines
+                        chunk.drop(chunk.loc[chunk['side'] != 'c'].index, inplace=True)
+                        chunk.drop(['side'], axis=1, inplace=True)
 
                     # add constant values
                     chunk['cachename'] = self._cachename
@@ -108,22 +111,20 @@ class Worker(Process):
                     # parse
 
                     # split xforwarded for, keep the first IP
-                    chunk.xforwardedfor = chunk.xforwardedfor.str.split(",", n=1, expand=True)[0]
+                    if 'xforwardedfor' in chunk.columns:
+                        chunk.xforwardedfor = chunk.xforwardedfor.str.split(",", n=1, expand=True)[0]
 
-                    # remove cache name, if present in host (http redirect)
-                    chunk['host'].replace(r"^[a-zA-Z0-9-]+--", '', inplace=True)
+                        # overwrite ip with xforwardedfor if it is 127.0.0.1 (TLS termination is from localhost)
+                        mask = chunk['ip'] == '127.0.0.1'
+                        chunk.loc[mask, 'ip'] = chunk.loc[mask, 'xforwardedfor']
+                        self._logger.debug(chunk.head(5))
+
+                        # drop xforwardedfor
+                        chunk.drop(['xforwardedfor'], axis=1, inplace=True)
+                        self._logger.debug(chunk.head(5))
 
                     # check if all public
                     assert True  # TODO: implement
-                    self._logger.debug(chunk.head(5))
-
-                    # overwrite ip with xforwardedfor if it is 127.0.0.1 (TLS termination is from localhost)
-                    mask = chunk['ip'] == '127.0.0.1'
-                    chunk.loc[mask, 'ip'] = chunk.loc[mask, 'xforwardedfor']
-                    self._logger.debug(chunk.head(5))
-
-                    # drop xforwardedfor
-                    chunk.drop(['xforwardedfor'], axis=1, inplace=True)
                     self._logger.debug(chunk.head(5))
 
                     # convert timetoserv unit from ms to sec
@@ -134,16 +135,23 @@ class Worker(Process):
                     chunk.drop(['request'], axis=1, inplace=True)
 
                     # parse url, skip schema, fragment
-                    dummy_schema, dummy_host, chunk['path'], dummy_query, dummy_fragment = zip(
+                    dummy_schema, chunk['host'], chunk['path'], dummy_query, dummy_fragment = zip(
                         *chunk['url'].map(urlsplit))
+
                     chunk.drop(['url'], axis=1, inplace=True)
 
+
+                    # remove cache name, if present in host (http redirect)
+                    chunk['host'].replace(r'^[a-zA-Z0-9-]+--', '', inplace=True, regex=True)
+                    chunk['host'].replace(r'^[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+\.', '', inplace=True, regex=True)
+
                     # session cookie
-                    dummy = chunk['sessioncookie'].str.extract(
-                        r"session=(?:-|([^,]+)),(?:-|([^,]+)),(?:-|([^,]+)),(?:-|([^,;]+))", expand=True)
-                    chunk['uid'] = dummy[0]
-                    chunk['sid'] = dummy[1]
-                    chunk.drop(['sessioncookie'], axis=1, inplace=True)
+                    if 'sessioncookie' in chunk.columns:
+                        dummy = chunk['sessioncookie'].str.extract(
+                            r"session=(?:-|([^,]+)),(?:-|([^,]+)),(?:-|([^,]+)),(?:-|([^,;]+))", expand=True)
+                        chunk['uid'] = dummy[0]
+                        chunk['sid'] = dummy[1]
+                        chunk.drop(['sessioncookie'], axis=1, inplace=True)
 
                     # channel number (.fillna().sum() takes care of the OR case in the regexp)
                     chunk['livechannel'] = chunk['path'].str.extract(r'PLTV/88888888/\d+/(\d+)/|([^/]+)\.isml',
@@ -201,9 +209,15 @@ class Worker(Process):
                     # anonymize
 
                     # substitute: map values to random hashes
-                    for prefix in ['cachename', 'popname', 'host', 'coordinates', 'devicebrand',
+                    columns = ['cachename', 'popname', 'host', 'coordinates', 'devicebrand',
                                    'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path',
-                                   'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid']:
+                                   'livechannel', 'contentpackage', 'assetnumber']
+                    if 'uid' in chunk.columns:
+                        columns.append('uid')
+                    if 'sid' in chunk.columns:
+                        columns.append('sid')
+
+                    for prefix in columns:
                         assert prefix in self._mydicts, f"Mapper prefix issue: '{prefix}' not found in '{self._mydicts}'"
                         chunk[prefix] = chunk[prefix].map(self._mydicts[prefix].map, na_action='ignore')
 
@@ -217,12 +231,18 @@ class Worker(Process):
 
                     #########################
                     # set index
-                    chunk.set_index(['#timestamp', 'statuscode', 'method', 'protocol',
+                    index = ['#timestamp', 'statuscode', 'method', 'protocol',
                                      'hit', 'contenttype', 'cachename', 'popname', 'host', 'coordinates', 'devicebrand',
                                      'devicefamily', 'devicemodel', 'osfamily', 'uafamily', 'uamajor', 'path',
                                      'manifest',
-                                     'fragment', 'livechannel', 'contentpackage', 'assetnumber', 'uid', 'sid',
-                                     'cachecontrol'],
+                                     'fragment', 'livechannel', 'contentpackage', 'assetnumber']
+                    if 'uid' in chunk.columns:
+                        columns.append('uid')
+                    if 'sid' in chunk.columns:
+                        columns.append('sid')
+                    if 'cachecontrol' in chunk.columns:
+                        columns.append('cachecontrol')
+                    chunk.set_index(index,
                                     inplace=True)
 
                     assert set(chunk.columns) == set(

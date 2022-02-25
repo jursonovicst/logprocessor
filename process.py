@@ -69,7 +69,7 @@ if __name__ == "__main__":
         list(map(lambda manager: manager.start(), managers))
 
         # shared dicts
-        mydicts = {prefix: manager.MyDict(hashlen) for prefix, manager, hashlen in zip(prefixes, managers, hashlens)}
+        mydicts = {prefix: manager.MyDict() for prefix, manager, hashlen in zip(prefixes, managers, hashlens)}
 
         # load from disk
         list(map(lambda mydict, prefix: mydict.load(f"secrets/secrets_{prefix}.csv"), mydicts.values(), prefixes))
@@ -81,6 +81,35 @@ if __name__ == "__main__":
         # open raw logfile
         # create progress bar for file position
         # create progress bar for processed lines
+
+        params = {'equuleus_v2': {}, 'omd': {}}
+
+        # X             X                            X                                                                              X   X     X                         X        X           X         X                                                                X                                                            X
+        # 0         1 2 3                     4      5                                                                              6   7 8   9              10         11       12  13      14  15 16 17                 18      19                                    20                                                 21 22     23
+        # 127.0.0.1 - - [22/Feb/2222:22:22:22 +0100] "GET http://xyz.cdn.de/this/is/the/path?and_this_is_the_query_string HTTP/1.1" 304 0 "-" "okhttp/4.9.0" xyz.cdn.de 0.000130 215 upstrea hit - 614 "application/json" 6596557 "session=-,INT-4178154,-,-; HttpOnly" "2222:22:2222:2222:2222:2222:2222:2222, 127.0.0.1" - TLSv1.2 c
+
+        # 0         1 2 3                     4      5                                         6   7   8   9              10          11       12  13       14  15 16  17                18        19                                      20                                 21                                      22                         23 24     25
+        # 127.0.0.1 - - [30/Jun/2021:07:05:20 +0200] "GET http://xyz.cdn.de/blablabl HTTP/1.1" 200 950 "-" "okhttp/4.9.0" xyz.cdn.com 0.000125 180 upstream hit - 1627 "application/zip" 978608424 "session=-,INT-969498284,-,-; HttpOnly" "Cache-Control:public,max-age=300" "ETag:18ad26753cb3db1be3cf097badf6df5d" "89.204.153.53, 127.0.0.1" - TLSv1.2 c
+        params['equuleus_v2']['usecols'] = [0, 3, 5, 6, 7, 9, 11, 12, 14, 17, 19, 20, 22, 25]
+        params['equuleus_v2']['names'] = ['ip', '#timestamp', 'request', 'statuscode', 'contentlength', 'useragent',
+                               'timefirstbyte',
+                               'timetoserv', 'hit', 'contenttype', 'sessioncookie', 'cachecontrol', 'xforwardedfor',
+                               'side']
+        params['equuleus_v2']['parse_dates'] = ['#timestamp']
+        #                           [22/Feb/2222:22:22:22s
+        params['equuleus_v2']['dateformat'] = '[%d/%b/%Y:%H:%M:%S'
+
+
+
+        # %<chi>         [%<cqtn>]                   \"%<cqhm> %<cquuc> %<cqpv>\"                                                    %<pssc> %<{Content-Length}psh> \"%<{Referer}cqh>\" \"%<{User-agent}cqh>\" %<{TS_MILESTONE_UA_BEGIN_WRITE-TS_MILESTONE_UA_BEGIN}msdms> %<ttms> %<nhi>        %<chm>   %<{Range}cqh> %<psql> %<psct>   %<cqssv> %<cqssc> %<cqtq> '
+        # 0              1                     2      3                                                                              4       5                      6                    7                8                                                                9       10            11       12            12      14        15       16       17
+        # 93.196.243.158 [22/Feb/2222:22:22:22 -0000] "GET http://xyz.cdn.de/this/is/the/path?and_this_is_the_query_string http/1.1" 200     2152541                "-"                  "Lavf/56.40.101" 7                                                                307     80.156.81.234 TCP_MISS -             2153093 video/mp4 -        -        1645502402.771
+        params['omd']['usecols'] =  [0,   1,            3,         4,            5,               7,           8,                9,            11,    14,         ]
+        params['omd']['names'] =   ['ip', '#timestamp', 'request', 'statuscode', 'contentlength', 'useragent', 'timefirstbyte', 'timetoserv', 'hit', 'contenttype']
+        params['omd']['parse_dates'] = ['#timestamp']
+        #                           [22/Feb/2222:22:22:22
+        params['omd']['dateformat'] = '[%d/%b/%Y:%H:%M:%S'
+
         workers = [
             Worker(i, f"{args.logfile}.ano-{i}.bz2", reader.queue, mydicts, args.cachename,
                    args.popname, config['secrets'].getint('timeshiftdays'), config['secrets'].getfloat('xyte'),
@@ -92,20 +121,10 @@ if __name__ == "__main__":
                    escapechar=args.escapechar,
                    header=None,
                    on_bad_lines='skip',
-                   # X             X                            X                                                                              X   X     X                         X        X           X         X                                                                X                                                            X
-                   # 0         1 2 3                     4      5                                                                              6   7 8   9              10         11       12  13      14  15 16 17                 18      19                                    20                                                 21 22     23
-                   # 127.0.0.1 - - [22/Feb/2222:22:22:22 +0100] "GET http://xyz.cdn.de/this/is/the/path?and_this_is_the_query_string HTTP/1.1" 304 0 "-" "okhttp/4.9.0" xyz.cdn.de 0.000130 215 upstrea hit - 614 "application/json" 6596557 "session=-,INT-4178154,-,-; HttpOnly" "2222:22:2222:2222:2222:2222:2222:2222, 127.0.0.1" - TLSv1.2 c
-
-                   # 0         1 2 3                     4      5                                         6   7   8   9              10          11       12  13       14  15 16  17                18        19                                      20                                 21                                      22                         23 24     25
-                   # 127.0.0.1 - - [30/Jun/2021:07:05:20 +0200] "GET http://xyz.cdn.de/blablabl HTTP/1.1" 200 950 "-" "okhttp/4.9.0" xyz.cdn.com 0.000125 180 upstream hit - 1627 "application/zip" 978608424 "session=-,INT-969498284,-,-; HttpOnly" "Cache-Control:public,max-age=300" "ETag:18ad26753cb3db1be3cf097badf6df5d" "89.204.153.53, 127.0.0.1" - TLSv1.2 c
-                   usecols=[0, 3, 5, 6, 7, 9, 10, 11, 12, 14, 17, 19, 20, 22, 25],
-                   names=['ip', '#timestamp', 'request', 'statuscode', 'contentlength', 'useragent', 'host',
-                          'timefirstbyte',
-                          'timetoserv', 'hit', 'contenttype', 'sessioncookie', 'cachecontrol', 'xforwardedfor',
-                          'side'],
-                   parse_dates=['#timestamp'],
-                   #           [22/Feb/2222:22:22:22s
-                   dateformat='[%d/%b/%Y:%H:%M:%S'
+                   usecols=params['omd']['usecols'],
+                   names=params['omd']['names'],
+                   parse_dates=params['omd']['parse_dates'],
+                   dateformat=params['omd']['dateformat'],
                    ) for i in range(0, args.nproc)]
 
         # good to go
