@@ -86,13 +86,6 @@ class Worker(Process):
                             or 'timetoserv' not in chunk.columns:
                         raise SyntaxError(f"Required column(s) not found: {chunk.columns}")
 
-                    if 'side' not in chunk.columns \
-                            or 'sessioncookie' not in chunk.columns \
-                            or 'xforwardedfor' not in chunk.columns \
-                            or 'cachecontrol' not in chunk.columns:
-                        self._logger.warn(f"Optional column(s) not found: {chunk.columns}")
-
-
                     self._logger.debug(chunk.head(5))
 
                     #########################
